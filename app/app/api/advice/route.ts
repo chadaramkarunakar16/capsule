@@ -67,19 +67,27 @@ export async function POST(req: Request) {
       });
     }
 
-    // outfits: advice grounded in the closet
+    // outfits: advice grounded in the closet and, if wanted, in what the person actually looks like
+    let pImage: Uint8Array | undefined, pMime: string | undefined, seesPhysique = false;
+    const pName = b?.useBodyPhoto === false ? null : p.avatar.aiImage ?? p.avatar.photo;
+    if (pName && /^[\w.-]+$/.test(pName) && fs.existsSync(path.join(UPLOAD_DIR, pName))) {
+      pImage = new Uint8Array(fs.readFileSync(path.join(UPLOAD_DIR, pName)));
+      pMime = MIME[path.extname(pName).toLowerCase()] ?? "image/jpeg";
+      seesPhysique = true;
+    }
     const items = all("SELECT name, category, color_name, fit, formality FROM items WHERE status = 'active' ORDER BY created_at DESC LIMIT 60");
     const closet = items.map((i) => `${i.name || i.category} [${i.category}, ${i.color_name || "colour ?"}${i.fit ? ", " + i.fit : ""}]`);
     const prompt = [
       ADVISOR_RULES, "", know, "",
       `CLOSET (${items.length} pieces; use these exact names)`, closet.length ? closet.join("\n") : "(empty)",
       b?.occasion ? `\nOCCASION: ${str(b.occasion, 80)}` : "",
+      seesPhysique ? "\nA full-body image of this person is attached. Use it to judge their real build, shoulder and hip balance, torso and leg length, and how clothes would sit on them, together with the PERSON section. Stay respectful: describe proportions neutrally and focus on what to wear." : "",
       "", 'Reply with ONE JSON object: {"summary":"2-3 sentences: what matters most for this person\u2019s build, height, proportions and colouring","do":["up to 5 specific styling moves (layering, fabrics, cuts, colours near the face)"],"avoid":["up to 3 gentle cautions"],"outfits":[{"name":"short name","items":["exact closet names"],"why":"one sentence tied to this person"}]}. Up to 3 outfits, each using only closet pieces; if the closet is empty or too small, return no outfits and say what to add in "do".',
     ].join("\n");
-    const j = (await askJSON("advice", { prompt, maxTokens: 1100 })) as Record<string, unknown>;
+    const j = (await askJSON("advice", { image: pImage, mime: pMime, prompt, maxTokens: 1100 })) as Record<string, unknown>;
     const names = new Set(items.map((i) => String(i.name || i.category)));
     return ok({
-      available: true,
+      available: true, usedPhoto: seesPhysique,
       advice: {
         summary: str(j.summary, 700),
         do: list(j.do).map((t) => str(t, 260)).filter(Boolean).slice(0, 5),

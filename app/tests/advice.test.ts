@@ -112,3 +112,19 @@ test("outfits: the briefing carries build, height and the closet, and only real 
 test("bad requests are refused", async () => {
   assert.equal((await post({ topic: "something" })).status, 400);
 });
+
+test("outfits: the stylist is shown the AI image / photo of the person when allowed, and not when switched off", async () => {
+  const jpeg = await sharp({ create: { width: 400, height: 700, channels: 3, background: "#bbbbbb" } }).jpeg().toBuffer();
+  fs.writeFileSync(path.join(db.UPLOAD_DIR, "me-ai.jpg"), jpeg);
+  saveProfile({ basics: { height: 180, weight: 58, direction: "Menswear", fit: "", aims: [], goals: [] }, avatar: { aiImage: "me-ai.jpg", look: "ai" } });
+  reply = { summary: "ok", do: [], avoid: [], outfits: [] };
+  seen.length = 0;
+  const on = await (await post({ topic: "outfits" })).json();
+  assert.equal(on.usedPhoto, true);
+  assert.equal(seen[0].body.contents[0].parts.length, 2, "image + prompt");
+  assert.match(text(seen[0]), /full-body image of this person is attached/);
+  seen.length = 0;
+  const off = await (await post({ topic: "outfits", useBodyPhoto: false })).json();
+  assert.equal(off.usedPhoto, false);
+  assert.equal(seen[0].body.contents[0].parts.length, 1);
+});

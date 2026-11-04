@@ -129,16 +129,28 @@ export const TRYON_MODELS: Record<Quality, { model: string; garmentsPerCall: num
   better: { model: "gemini-3.1-flash-image", garmentsPerCall: 3 },
 };
 
+/**
+ * The picture of YOU is the one place model quality matters most: it has to be recognisably the same person.
+ * gemini-3.1-flash-image keeps a person's identity from reference photos (up to 4 people / 14 references), the cheaper
+ * 2.5 model drifts more, so this feature always uses the stronger one (about $0.067 per image) whatever the quality setting.
+ */
+export const AVATAR_MODEL = "gemini-3.1-flash-image";
+
 export type Img = { data: Uint8Array; mime: string };
 
 /** Sends reference photos + an instruction, returns the picture Gemini made. */
-export async function geminiImage(model: string, prompt: string, refs: Img[]): Promise<Img> {
+export async function geminiImage(model: string, prompt: string, refs: Img[], opts: { aspect?: string } = {}): Promise<Img> {
   const url = `${process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com"}/v1beta/models/${model}:generateContent`;
-  const body = JSON.stringify({
+  const body = (withAspect: boolean) => JSON.stringify({
     contents: [{ role: "user", parts: [...refs.map((r) => ({ inline_data: { mime_type: r.mime, data: b64(r.data) } })), { text: prompt }] }],
-    generationConfig: { responseModalities: ["IMAGE"], temperature: 0.4 },
+    generationConfig: { responseModalities: ["IMAGE"], temperature: 0.4, ...(withAspect && opts.aspect ? { imageConfig: { aspectRatio: opts.aspect } } : {}) },
   });
-  const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": geminiKey() }, body, signal: AbortSignal.timeout(120_000) });
+  const call = (withAspect: boolean) => fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": geminiKey() }, body: body(withAspect), signal: AbortSignal.timeout(120_000) });
+  let r = await call(true);
+  if (r.status === 400 && opts.aspect) {
+    const t = await r.clone().text();
+    if (/imageConfig|aspect|Unknown name/i.test(t)) r = await call(false); // this model does not take an aspect ratio
+  }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(friendly(r.status, j?.error?.message ?? ""));
   const parts: { inlineData?: { mimeType: string; data: string }; inline_data?: { mime_type: string; data: string }; text?: string }[] = j.candidates?.[0]?.content?.parts ?? [];

@@ -41,6 +41,7 @@ export function StylistAdvice({ topic: initial }: { topic: Topic }) {
   const [topic, setTopic] = useState<Topic>(initial);
   const [occasion, setOccasion] = useState("");
   const [usePhoto, setUsePhoto] = useState(true);
+  const [useBody, setUseBody] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [res, setRes] = useState<Partial<Record<Topic, { advice: Advice; usedPhoto?: boolean }>>>({});
@@ -57,7 +58,7 @@ export function StylistAdvice({ topic: initial }: { topic: Topic }) {
   async function ask() {
     setBusy(true); setErr(null);
     try {
-      const r = await api.advice({ topic, occasion: topic === "outfits" ? occasion : undefined, useFacePhoto: topic === "grooming" && usePhoto && !!p.avatar.facePhoto });
+      const r = await api.advice({ topic, occasion: topic === "outfits" ? occasion : undefined, useFacePhoto: topic === "grooming" && usePhoto && !!p.avatar.facePhoto, useBodyPhoto: topic === "outfits" ? useBody : undefined });
       if (!r.available || !r.advice) throw new Error("Add your Gemini key under Me → AI first.");
       setRes((cur) => ({ ...cur, [topic]: { advice: r.advice!, usedPhoto: r.usedPhoto } }));
     } catch (e) { setErr(e instanceof Error ? e.message : "The stylist couldn’t answer"); }
@@ -98,6 +99,9 @@ export function StylistAdvice({ topic: initial }: { topic: Topic }) {
         {topic === "grooming" && p.avatar.facePhoto && (
           <label className="job" style={{ cursor: "pointer", padding: 0 }}><input type="checkbox" checked={usePhoto} onChange={(e) => setUsePhoto(e.target.checked)} /><span>Let the stylist look at my saved face photo <span className="muted xs">(sent to Google only now)</span></span></label>
         )}
+        {topic === "outfits" && (p.avatar.aiImage || p.avatar.photo) && (
+          <label className="job" style={{ cursor: "pointer", padding: 0 }}><input type="checkbox" checked={useBody} onChange={(e) => setUseBody(e.target.checked)} /><span>Let the stylist see my {p.avatar.aiImage ? "AI image" : "photo"} to judge my build <span className="muted xs">(sent to Google only now)</span></span></label>
+        )}
         {topic === "outfits" && <input className="input" placeholder="Occasion (optional), e.g. dinner, office, trip" value={occasion} onChange={(e) => setOccasion(e.target.value)} />}
 
         <div>
@@ -116,7 +120,7 @@ export function StylistAdvice({ topic: initial }: { topic: Topic }) {
             <div className="card" style={{ padding: 14 }}>
               <b style={{ fontSize: 15 }}>For you</b>
               <p className="sm" style={{ lineHeight: 1.55, marginTop: 4 }}>{shown.advice.summary}</p>
-              {shown.usedPhoto && <p className="xs muted" style={{ marginTop: 6 }}>Includes what the stylist could see in your face photo.</p>}
+              {shown.usedPhoto && <p className="xs muted" style={{ marginTop: 6 }}>{topic === "grooming" ? "Includes what the stylist could see in your face photo." : "Based on your profile and what the stylist could see in your image."}</p>}
             </div>
             {topic === "grooming" ? (
               <>

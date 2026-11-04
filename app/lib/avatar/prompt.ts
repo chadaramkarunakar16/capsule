@@ -13,12 +13,14 @@ export function proportionSentence(p: Profile): string {
 }
 
 export function avatarPrompt(p: Profile, refs: { body: boolean; face: boolean }): string {
-  const which = refs.body && refs.face ? "Image 1 is a full-body photo and image 2 is a face photo of the same person." : refs.body ? "The image is a full-body photo of one person." : "The image is a face photo of one person.";
+  const which = refs.body && refs.face ? "Image 1 is a full-body photo and image 2 is a face photo of the same real person." : refs.body ? "The image is a full-body photo of one real person." : "The image is a face photo of one real person.";
   return [
     which,
-    "Create a new photo-realistic, full-body, front-facing image of this same real person standing naturally with arms slightly away from the body, on a plain light-grey studio background, wearing simple fitted neutral clothes (a plain white t-shirt and plain grey trousers) and barefoot or in plain white sneakers.",
-    "Keep the face, hair, skin tone and overall build faithful to the reference. The body must match the real person's proportions: do not make them slimmer, more muscular, taller, or more idealised than they are, and keep shoulder-to-hip balance and torso-to-leg ratio as in the reference.",
+    "TASK: create a new photo-realistic, full-body, front-facing image of THIS SAME PERSON standing naturally and relaxed, arms slightly away from the body, feet visible, on a plain light-grey studio background with even soft lighting.",
+    "IDENTITY IS THE TOP PRIORITY. The result must be instantly recognisable as the person in the reference photos: same face shape, eyes, eyebrows, nose, mouth, ears, hairline and hairstyle, hair colour and texture, skin tone and undertone, facial hair, glasses if worn, freckles or marks. Do not beautify, de-age, change ethnicity, or give a generic model face.",
+    "PHYSIQUE MUST BE CLEARLY VISIBLE and true to life: dress them in plain, well-fitted (not baggy) clothes, a plain white fitted t-shirt and plain grey slim trousers, so shoulders, chest, waist, hips, arms, torso length and leg length can be read. Keep their real build and proportions exactly: do not make them slimmer, more muscular, taller, shorter or more idealised, and keep the shoulder-to-hip balance and torso-to-leg ratio of the reference.",
+    refs.body ? "Use the full-body photo for body shape and the face photo (if given) for facial detail." : "Only a face photo is available, so keep the body in line with the known proportions below rather than inventing an athletic or model body.",
     proportionSentence(p),
-    "Output only the image, no text or watermark.",
+    "Output only the image, no text, borders or watermark.",
   ].filter(Boolean).join(" ");
 }

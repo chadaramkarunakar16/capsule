@@ -10,7 +10,7 @@ process.env.CAPSULE_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "capsule-ai
 delete process.env.GEMINI_API_KEY;
 delete process.env.ANTHROPIC_API_KEY;
 
-type Seen = { url: string; key: string | undefined; body: Record<string, any> }; // eslint-disable-line @typescript-eslint/no-explicit-any
+type Seen = { url: string; key?: string | undefined; body: Record<string, any> }; // eslint-disable-line @typescript-eslint/no-explicit-any
 const seen: Seen[] = [];
 let reject400Once = false;
 let noPicture = false;
@@ -151,4 +151,34 @@ test("try-on provider: your pick if its key exists, else Gemini, else FASHN", ()
   settings.writeSettings({});
   assert.equal(settings.tryonProvider(), null);
   settings.writeSettings({ geminiKey: "AIzaTEST" });
+});
+
+test("the picture of you always uses the stronger identity-keeping image model", () => {
+  assert.equal(ai.AVATAR_MODEL, "gemini-3.1-flash-image");
+});
+
+test("image calls can ask for a portrait aspect ratio and fall back if the model refuses the option", async () => {
+  seen.length = 0;
+  const out = await ai.geminiImage(ai.AVATAR_MODEL, "p", [{ data: new Uint8Array([1]), mime: "image/jpeg" }], { aspect: "2:3" });
+  assert.equal(out.mime, "image/png");
+  assert.equal(seen[0].body.generationConfig.imageConfig.aspectRatio, "2:3");
+  // a model that rejects imageConfig → retried without it
+  const orig = server.listeners("request")[0] as http.RequestListener;
+  server.removeAllListeners("request");
+  let n = 0;
+  server.on("request", (req, res) => {
+    let raw = ""; req.on("data", (c) => (raw += c)); req.on("end", () => {
+      const b = JSON.parse(raw); seen.push({ url: req.url!, body: b }); n++;
+      res.setHeader("content-type", "application/json");
+      if (b.generationConfig.imageConfig) { res.statusCode = 400; return res.end(JSON.stringify({ error: { message: "Unknown name \"imageConfig\"" } })); }
+      res.end(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: Buffer.from("OK").toString("base64") } }] } }] }));
+    });
+  });
+  seen.length = 0;
+  const out2 = await ai.geminiImage(ai.AVATAR_MODEL, "p", [{ data: new Uint8Array([1]), mime: "image/jpeg" }], { aspect: "2:3" });
+  assert.equal(Buffer.from(out2.data).toString(), "OK");
+  assert.equal(n, 2);
+  assert.equal(seen[1].body.generationConfig.imageConfig, undefined);
+  server.removeAllListeners("request");
+  server.on("request", orig);
 });

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { UPLOAD_DIR, fail, get, ok, uid } from "@/lib/db";
-import { TRYON_MODELS, geminiImage, quality, type Img } from "@/lib/ai";
+import { AVATAR_MODEL, geminiImage, type Img } from "@/lib/ai";
 import { avatarPrompt } from "@/lib/avatar/prompt";
 import { normalizeProfile } from "@/lib/style/profile";
 import { geminiKey } from "@/lib/settings";
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   try { if (row) profile = normalizeProfile(JSON.parse(row.data)); } catch { /* use defaults */ }
   try {
     const refs = [body, face].filter((x): x is Img => !!x);
-    const out = await geminiImage(TRYON_MODELS[quality()].model, avatarPrompt(profile, { body: !!body, face: !!face }), refs);
+    const out = await geminiImage(AVATAR_MODEL, avatarPrompt(profile, { body: !!body, face: !!face }), refs, { aspect: "2:3" });
     const ext = out.mime.includes("png") ? "png" : out.mime.includes("webp") ? "webp" : "jpg";
     const name = `${uid()}-avatar.${ext}`;
     fs.writeFileSync(path.join(UPLOAD_DIR, name), Buffer.from(out.data));

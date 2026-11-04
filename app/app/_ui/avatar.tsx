@@ -166,10 +166,10 @@ export function AvatarEditor() {
               <button className={a.look === "ai" ? "on" : ""} disabled={!a.aiImage} onClick={() => set({ look: "ai" })}>AI image</button>
             </div>
             <div>
-              <button className="btn dark sm" disabled={!hasPhoto || ai.busy} onClick={makeAi}>{ai.busy ? "Creating… (about 20 seconds)" : a.aiImage ? "Create it again" : "Create an AI image of me"}</button>
+              <button className="btn dark sm" disabled={!hasPhoto || ai.busy} onClick={makeAi}>{ai.busy ? "Creating… (20–40 seconds)" : a.aiImage ? "Create it again" : "Create an AI image of me"}</button>
               <p className="xs muted" style={{ marginTop: 8, lineHeight: 1.5 }}>
                 {hasPhoto
-                  ? "Makes a new full-body image of you from your photo(s), keeping your face and rough proportions (shoulders, torso, legs) — in plain clothes on a plain background. It is sent to Google Gemini only when you press the button (about 4–7 US cents), and it is an approximation."
+                  ? "Uses your saved photos as the reference to make a new full-body image that looks like you — your face, hair and skin tone — in plain, fitted clothes so your real build and proportions are easy to read. It uses Google’s stronger image model (about 7 US cents per image) because looking like you matters, and it is sent to Google only when you press the button. Then the stylist can use it to judge your build for outfit advice."
                   : "Press “Use as my avatar” on a photo above first. Then you can show your own photo here, or have an AI image made from it."}
               </p>
               {ai.err && <div className="sm" style={{ color: "var(--danger)", marginTop: 6, lineHeight: 1.4 }}>{ai.err}</div>}

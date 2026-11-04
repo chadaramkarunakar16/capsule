@@ -19,9 +19,12 @@ test("proportions from the profile are spelled out for the image model", () => {
 test("the prompt names which reference is which, and forbids idealising the body", () => {
   const both = avatarPrompt(withBody, { body: true, face: true });
   assert.match(both, /Image 1 is a full-body photo and image 2 is a face photo/);
-  assert.match(both, /do not make them slimmer, more muscular, taller, or more idealised/);
+  assert.match(both, /do not make them slimmer, more muscular, taller, shorter or more idealised/);
+  assert.match(both, /IDENTITY IS THE TOP PRIORITY/);
+  assert.match(both, /PHYSIQUE MUST BE CLEARLY VISIBLE/);
+  assert.match(both, /well-fitted \(not baggy\)/);
   assert.match(both, /Known proportions/);
-  assert.match(avatarPrompt(withBody, { body: false, face: true }), /face photo of one person/);
+  assert.match(avatarPrompt(withBody, { body: false, face: true }), /face photo of one real person/);
 });
 
 test("older saved profiles gain the new avatar fields with safe defaults", () => {

@@ -79,7 +79,7 @@ export const api = {
 
   avatarImage: (b: { photo?: string | null; facePhoto?: string | null }) => req<{ available: boolean; image?: string }>("/api/avatar/generate", send("POST", b)),
 
-  advice: (b: { topic: "grooming" | "outfits"; occasion?: string; useFacePhoto?: boolean }) => req<{ available: boolean; usedPhoto?: boolean; advice?: Advice }>("/api/advice", send("POST", b)),
+  advice: (b: { topic: "grooming" | "outfits"; occasion?: string; useFacePhoto?: boolean; useBodyPhoto?: boolean }) => req<{ available: boolean; usedPhoto?: boolean; advice?: Advice }>("/api/advice", send("POST", b)),
 
   tryon: (b: { person: string; garments: { image: string; category: string }[] }) => req<{ available: boolean; image?: string; steps?: number; provider?: string }>("/api/tryon", send("POST", b)),
 
