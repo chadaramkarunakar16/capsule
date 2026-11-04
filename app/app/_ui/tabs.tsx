@@ -360,8 +360,8 @@ export function MeTab() {
   return (
     <>
       <div className="hdr"><h1 className="title">Me</h1></div>
-      <div className="scroll">
-        <div className="sec" style={{ paddingTop: 8 }}>
+      <div className="scroll cols">
+        <div className="sec span" style={{ paddingTop: 8 }}>
           <div className="stat">
             <div><b>{items.length}</b><span className="xs muted">pieces</span></div>
             <div><b>{outfits.length}</b><span className="xs muted">outfits</span></div>

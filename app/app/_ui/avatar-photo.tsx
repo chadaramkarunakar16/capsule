@@ -11,7 +11,7 @@ const TRYABLE = ["Tops", "Bottoms", "Dresses"];
 
 /** Realistic try-on on the user's own photo, through Gemini (or FASHN). Only runs when the user presses the button. */
 export function PhotoTryOn({ itemIds }: { itemIds: string[] }) {
-  const { itemById, boards, pop, push, toast, refresh } = useStore();
+  const { itemById, boards, pop, push, toast, refresh, profile } = useStore();
   const [st, setSt] = useState<Awaited<ReturnType<typeof api.settings>> | null>(null);
   const [consent, setConsent] = useState(false);
   const [person, setPerson] = useState<{ uri: string; preview: string } | null>(null);
@@ -23,6 +23,22 @@ export function PhotoTryOn({ itemIds }: { itemIds: string[] }) {
   const tryable = all.filter((i) => TRYABLE.includes(i.category));
   const skipped = all.filter((i) => !TRYABLE.includes(i.category));
   const [chosen, setChosen] = useState<string[]>(() => tryable.map((i) => i.id));
+
+  // a photo you chose to keep as your avatar is used automatically
+  useEffect(() => {
+    const name = profile.avatar.photo;
+    if (!name) return;
+    let alive = true;
+    (async () => {
+      try {
+        const blob = await (await fetch(await imageUrl(imgPath(name)))).blob();
+        const uri = await toJpegDataUri(blob, 1296);
+        if (alive) setPerson((cur) => cur ?? { uri, preview: URL.createObjectURL(blob) });
+      } catch { /* the user can still pick a photo */ }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.avatar.photo]);
 
   useEffect(() => {
     api.settings().then(setSt).catch(() => {});

@@ -37,9 +37,13 @@ export function AddSheet() {
         const original = await downscaleJpeg(f);
         let cutout: Blob = original, w = 0, h = 0;
         if (cut) {
-          patch(id, { status: "Removing background (first run downloads a model)…" });
+          patch(id, { status: "Removing background…" });
           try {
-            const png = await removeBg(original);
+            let last = -1;
+            const png = await removeBg(original, (p, what) => {
+              const pct = Math.round(p * 100);
+              if (pct !== last) { last = pct; patch(id, { status: what.startsWith("fetch") ? `Loading cut-out model… ${pct}%` : "Removing background…" }); }
+            });
             const t = await trimPng(png);
             cutout = t.blob; w = t.w; h = t.h;
           } catch (e) {
@@ -167,7 +171,7 @@ export function AddSheet() {
                 <div className="th"><img src={j.preview} alt="" /></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{j.name}</div>
-                  <div className="xs muted">{j.status}</div>
+                  <div className="xs muted" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{j.status}</div>
                 </div>
                 {j.state === "run" ? <span className="spin" /> : j.state === "done" ? <span style={{ color: "var(--good)" }}>✓</span> : <span style={{ color: "var(--danger)" }}>!</span>}
               </div>

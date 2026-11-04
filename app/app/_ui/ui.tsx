@@ -50,6 +50,17 @@ export function Img({ name, w, alt = "", ...rest }: ImgProps) {
   return src ? <img src={src} alt={alt} {...rest} /> : <span {...(rest as object)} aria-hidden style={{ display: "block", ...rest.style }} />;
 }
 
+export function Chips<T extends string>({ options, value, onPick, labels }: { options: readonly T[]; value: T | null | ""; onPick: (v: T | null) => void; labels?: Record<string, string> }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      {options.map((o) => (
+        <button key={o} className={`chip ${value === o ? "on" : ""}`} onClick={() => onPick(value === o ? null : o)}>{labels?.[o] ?? o.charAt(0).toUpperCase() + o.slice(1)}</button>
+      ))}
+    </div>
+  );
+}
+
+
 /** 2x2 preview of an outfit's pieces. */
 export function Collage({ items, big }: { items: Item[]; big?: boolean }) {
   const s = [...items].sort(byCat).slice(0, 4);

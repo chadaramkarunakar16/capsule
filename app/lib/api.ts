@@ -77,6 +77,8 @@ export const api = {
   deleteProduct: (id: string) => req(`/api/products/${id}`, send("DELETE")),
   refreshProduct: (id: string) => req<Product>(`/api/products/${id}/refresh`, send("POST")),
 
+  avatarImage: (b: { photo?: string | null; facePhoto?: string | null }) => req<{ available: boolean; image?: string }>("/api/avatar/generate", send("POST", b)),
+
   tryon: (b: { person: string; garments: { image: string; category: string }[] }) => req<{ available: boolean; image?: string; steps?: number; provider?: string }>("/api/tryon", send("POST", b)),
 
   inventory: () => req<{ rows: Record<string, number>; profile: boolean; photos: { files: number; bytes: number }; thumbs: { files: number; bytes: number }; models: { files: number; bytes: number }; keys: { anthropic: boolean; serpapi: boolean; fashn: boolean }; pin: boolean }>("/api/privacy/inventory"),

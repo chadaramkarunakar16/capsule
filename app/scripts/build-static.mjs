@@ -11,6 +11,7 @@ const SKIP = new Set(["node_modules", ".next", "out", "data", WORK, ".git", "fun
 const env = { ...process.env, CAPSULE_STATIC: "1", NEXT_PUBLIC_ENGINE: "browser" };
 
 execSync("node scripts/copy-wasm.mjs", { stdio: "inherit", env });
+execSync("node scripts/fetch-imgly.mjs", { stdio: "inherit", env });
 execSync("node scripts/build-engine.mjs", { stdio: "inherit", env });
 
 fs.rmSync(WORK, { recursive: true, force: true });

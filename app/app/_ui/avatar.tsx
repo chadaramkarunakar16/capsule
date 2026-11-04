@@ -4,9 +4,14 @@ import { api, imgPath } from "@/lib/api";
 import { imageUrl } from "@/lib/engine";
 import { CANVAS, DEFAULT_ASPECT, HAIR_COLOURS, SKIN_TONES, defaultBuild, geometry, layers, placeItem } from "@/lib/avatar/geometry";
 import type { HairStyle, Profile } from "@/lib/style/profile";
+import { normalizeProfile } from "@/lib/style/profile";
+import { LABELS } from "@/lib/style/body";
+import { FACE_BLURB, FACE_SHAPES, type FaceShape } from "@/lib/style/face";
+import { seasonByKey } from "@/lib/style/seasons";
 import type { Item } from "@/lib/types";
 import { PickItems } from "./pick";
-import { Overlay, useImageUrl } from "./ui";
+import { MyPhotos, useFigureWidth } from "./my-photos";
+import { Chips, Img, Overlay, useImageUrl } from "./ui";
 import { useStore } from "./store";
 
 const BASE = "#e6e1d8"; // neutral base layer, so the figure is never "bare"
@@ -69,6 +74,15 @@ export function AvatarFigure({ profile, items = [], width = 220, label = false }
   };
 
   const worn = layers(items);
+  const shown = a.look === "ai" ? a.aiImage : a.look === "photo" ? a.photo ?? a.facePhoto : null;
+  if (shown) {
+    return (
+      <figure style={{ margin: 0, position: "relative", width }}>
+        <Img name={shown} alt="Me" style={{ width, height: width * 1.5, objectFit: "contain", borderRadius: 14 }} />
+        {label && <figcaption style={{ position: "absolute", top: 4, left: 4, fontSize: 10.5, fontWeight: 600, background: "rgba(255,255,255,.9)", borderRadius: 99, padding: "3px 9px", color: "var(--muted)" }}>{a.look === "ai" ? "AI image of you — approximate" : "Your photo"}</figcaption>}
+      </figure>
+    );
+  }
   return (
     <figure style={{ margin: 0, position: "relative", width }}>
       <svg viewBox={`0 0 ${CANVAS.w} ${CANVAS.h}`} width={width} height={(width * CANVAS.h) / CANVAS.w} role="img" aria-label="Avatar preview" style={{ display: "block" }}>
@@ -101,50 +115,137 @@ export function AvatarFigure({ profile, items = [], width = 220, label = false }
 
 const Slider = ({ label, value, onChange, min = -1, max = 1, hint }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; hint?: string }) => (
   <div>
-    <label className="f" style={{ display: "flex", justifyContent: "space-between" }}><span>{label}</span><span className="muted">{hint}</span></label>
+    <label className="f" style={{ display: "flex", justifyContent: "space-between" }}><span>{label}</span><span className="muted">{hint ?? (value === 0 ? "as profile" : `${value > 0 ? "+" : ""}${Math.round(value * 100)}`)}</span></label>
     <input type="range" min={min} max={max} step={0.05} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ width: "100%", accentColor: "var(--ink)" }} />
   </div>
 );
 
 export function AvatarEditor() {
   const { profile, saveProfile, pop, toast, push } = useStore();
-  const [p, setP] = useState<Profile>(() => JSON.parse(JSON.stringify(profile)));
+  const figW = useFigureWidth();
+  const [p, setP] = useState<Profile>(() => normalizeProfile(JSON.parse(JSON.stringify(profile))));
   const set = (x: Partial<Profile["avatar"]>) => setP((cur) => ({ ...cur, avatar: { ...cur.avatar, ...x } }));
   const a = p.avatar;
   const startBuild = a.build ?? defaultBuild(p.basics.height, p.basics.weight);
   const measured = !!(p.measurements.chest || p.measurements.hip);
+  const num = (v: string) => (v === "" ? null : Number(v) || null);
+  const setBasics = (x: Partial<Profile["basics"]>) => setP((cur) => ({ ...cur, basics: { ...cur.basics, ...x } }));
+  const setBody = (x: Partial<Profile["body"]>) => setP((cur) => ({ ...cur, body: { ...cur.body, ...x, source: cur.body.source ?? "self" } }));
+  const setFace = (x: Partial<Profile["face"]>) => setP((cur) => ({ ...cur, face: { ...cur.face, ...x } }));
+  const [ai, setAi] = useState<{ busy: boolean; err: string | null }>({ busy: false, err: null });
+  const hasPhoto = !!(a.photo || a.facePhoto);
+  async function makeAi() {
+    setAi({ busy: true, err: null });
+    try {
+      const r = await api.avatarImage({ photo: a.photo, facePhoto: a.facePhoto });
+      if (!r.available || !r.image) throw new Error("Add your Gemini key under Me → AI first.");
+      set({ aiImage: r.image, look: "ai" });
+      setAi({ busy: false, err: null });
+    } catch (e) { setAi({ busy: false, err: e instanceof Error ? e.message : "Couldn’t create the image" }); }
+  }
   return (
-    <Overlay title="My avatar" onBack={pop} foot={<button className="btn dark full" onClick={async () => { await saveProfile(p); toast("Avatar saved"); pop(); }}>Save</button>}>
-      <div style={{ display: "flex", justifyContent: "center", padding: "6px 0 4px", background: "var(--stage)", margin: "0 20px", borderRadius: 20 }}>
-        <AvatarFigure profile={p} width={170} />
-      </div>
-      <div className="sec" style={{ display: "grid", gap: 14 }}>
-        <p className="xs muted" style={{ lineHeight: 1.5 }}>This is a simple figure to help you judge proportion and colour — not a portrait. Proportions start from your profile (shoulders, hips, torso and legs{measured ? ", and your measurements" : ""}); nudge the sliders until it feels like you.</p>
-        <div>
-          <label className="f">Skin tone</label>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {SKIN_TONES.map((c) => <button key={c} aria-label={`Skin ${c}`} onClick={() => set({ skin: c })} className="sw" style={{ background: c, boxShadow: a.skin === c ? "0 0 0 2.5px var(--ink)" : "inset 0 0 0 1px rgba(0,0,0,.12)", width: 34, height: 34 }} />)}
-            <label className="sw" style={{ width: 34, height: 34, display: "grid", placeItems: "center", cursor: "pointer", background: a.skin && !SKIN_TONES.includes(a.skin) ? a.skin : "#fff", boxShadow: "inset 0 0 0 1px rgba(0,0,0,.2)", fontSize: 16 }}>＋<input type="color" value={a.skin ?? "#e0ac86"} onChange={(e) => set({ skin: e.target.value })} style={{ display: "none" }} /></label>
-          </div>
-          {profile.color.photos > 0 && <p className="xs muted" style={{ marginTop: 6 }}>Starting value came from your colour photos.</p>}
+    <Overlay title="My avatar and face" onBack={pop} foot={<button className="btn dark full" onClick={async () => { await saveProfile(p); toast("Saved"); pop(); }}>Save</button>}>
+      <div className="split">
+        <div className="split-fig">
+          <div className="split-stage"><AvatarFigure profile={p} width={figW} /></div>
+          <div className="xs muted" style={{ textAlign: "center", marginTop: 6 }}>Live preview — updates as you change things</div>
         </div>
-        <div>
-          <label className="f">Hair</label>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-            {HAIR_COLOURS.map((c) => <button key={c} aria-label={`Hair ${c}`} onClick={() => set({ hair: c })} className="sw" style={{ background: c, boxShadow: a.hair === c ? "0 0 0 2.5px var(--ink)" : "inset 0 0 0 1px rgba(0,0,0,.12)", width: 30, height: 30 }} />)}
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {(["short", "medium", "long", "bun", "none"] as HairStyle[]).map((s) => <button key={s} className={`chip ${a.hairStyle === s ? "on" : ""}`} onClick={() => set({ hairStyle: s })}>{s === "none" ? "Bald / covered" : s[0].toUpperCase() + s.slice(1)}</button>)}
-          </div>
-        </div>
-        {!measured && <Slider label="Build" value={startBuild} onChange={(v) => set({ build: v })} hint={a.build == null && p.basics.weight ? "from height & weight — adjust freely" : undefined} />}
-        <Slider label="Shoulders" value={a.shoulders} onChange={(v) => set({ shoulders: v })} />
-        <Slider label="Waist" value={a.waist} onChange={(v) => set({ waist: v })} />
-        <Slider label="Hips" value={a.hips} onChange={(v) => set({ hips: v })} />
-        <Slider label="Leg length" value={a.legs} onChange={(v) => set({ legs: v })} />
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn light sm" style={{ flex: 1 }} onClick={() => set({ build: null, shoulders: 0, hips: 0, legs: 0, waist: 0 })}>Reset sliders</button>
-          <button className="btn light sm" style={{ flex: 1 }} onClick={() => push({ t: "style", section: "body" })}>Edit proportions</button>
+        <div className="ctl">
+          <p className="xs muted" style={{ lineHeight: 1.5 }}>A simple figure to help you judge proportion and colour — not a portrait. It uses the same answers as your style profile, so anything you set here or there is shared.</p>
+
+          <section className="ctl-group">
+            <h3>Add my photos</h3>
+            <MyPhotos p={p} setP={setP} />
+          </section>
+
+          <section className="ctl-group">
+            <h3>How I appear</h3>
+            <div className="seg" style={{ margin: 0 }}>
+              <button className={a.look === "figure" ? "on" : ""} onClick={() => set({ look: "figure" })}>Simple figure</button>
+              <button className={a.look === "photo" ? "on" : ""} disabled={!hasPhoto} onClick={() => set({ look: "photo" })}>My photo</button>
+              <button className={a.look === "ai" ? "on" : ""} disabled={!a.aiImage} onClick={() => set({ look: "ai" })}>AI image</button>
+            </div>
+            <div>
+              <button className="btn dark sm" disabled={!hasPhoto || ai.busy} onClick={makeAi}>{ai.busy ? "Creating… (about 20 seconds)" : a.aiImage ? "Create it again" : "Create an AI image of me"}</button>
+              <p className="xs muted" style={{ marginTop: 8, lineHeight: 1.5 }}>
+                {hasPhoto
+                  ? "Makes a new full-body image of you from your photo(s), keeping your face and rough proportions (shoulders, torso, legs) — in plain clothes on a plain background. It is sent to Google Gemini only when you press the button (about 4–7 US cents), and it is an approximation."
+                  : "Press “Use as my avatar” on a photo above first. Then you can show your own photo here, or have an AI image made from it."}
+              </p>
+              {ai.err && <div className="sm" style={{ color: "var(--danger)", marginTop: 6, lineHeight: 1.4 }}>{ai.err}</div>}
+            </div>
+          </section>
+
+          <section className="ctl-group">
+            <h3>About you</h3>
+            <div className="fgrid">
+              <div><label className="f">Height (cm)</label><input className="input" inputMode="numeric" value={p.basics.height ?? ""} onChange={(e) => setBasics({ height: num(e.target.value) })} /></div>
+              <div><label className="f">Weight (kg, optional)</label><input className="input" inputMode="numeric" value={p.basics.weight ?? ""} onChange={(e) => setBasics({ weight: num(e.target.value) })} /></div>
+            </div>
+            <div>
+              <label className="f">Shoulders vs hips</label>
+              <Chips options={["broader-shoulders", "balanced", "broader-hips"] as const} value={p.body.shoulderHip} onPick={(v) => setBody({ shoulderHip: v })} labels={LABELS.shoulderHip} />
+            </div>
+            <div>
+              <label className="f">Torso vs legs</label>
+              <Chips options={["longer-torso", "balanced", "longer-legs"] as const} value={p.body.torsoLeg} onPick={(v) => setBody({ torsoLeg: v })} labels={LABELS.torsoLeg} />
+            </div>
+            <div>
+              <label className="f">Waist</label>
+              <Chips options={["defined", "straight"] as const} value={p.body.waist} onPick={(v) => setBody({ waist: v })} labels={LABELS.waist} />
+            </div>
+            <button className="btn light sm" style={{ justifySelf: "start" }} onClick={() => push({ t: "style", section: "body" })}>Use tape measurements instead</button>
+          </section>
+
+          <section className="ctl-group">
+            <h3>Face</h3>
+            <div>
+              <label className="f">Face shape</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {FACE_SHAPES.map((s: FaceShape) => (
+                  <button key={s} className={`chip ${p.face.shape === s ? "on" : ""}`} onClick={() => setFace({ shape: p.face.shape === s ? null : s, overridden: true })}>{s[0].toUpperCase() + s.slice(1)}</button>
+                ))}
+              </div>
+              {p.face.shape && <p className="xs muted" style={{ marginTop: 8, lineHeight: 1.5 }}>{FACE_BLURB[p.face.shape]}</p>}
+            </div>
+            <label className="job" style={{ cursor: "pointer", padding: 0 }}>
+              <input type="checkbox" checked={p.face.wearsGlasses} onChange={(e) => setFace({ wearsGlasses: e.target.checked })} />
+              <span>I wear glasses</span>
+            </label>
+            <button className="btn light sm" style={{ justifySelf: "start" }} onClick={() => push({ t: "grooming" })}>Hair, beard and glasses ideas</button>
+          </section>
+
+          <section className="ctl-group">
+            <h3>Colouring</h3>
+            <div>
+              <label className="f">Skin tone</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {SKIN_TONES.map((c) => <button key={c} aria-label={`Skin ${c}`} onClick={() => set({ skin: c })} className="sw" style={{ background: c, boxShadow: a.skin === c ? "0 0 0 2.5px var(--ink)" : "inset 0 0 0 1px rgba(0,0,0,.12)", width: 34, height: 34 }} />)}
+                <label className="sw" style={{ width: 34, height: 34, display: "grid", placeItems: "center", cursor: "pointer", background: a.skin && !SKIN_TONES.includes(a.skin) ? a.skin : "#fff", boxShadow: "inset 0 0 0 1px rgba(0,0,0,.2)", fontSize: 16 }}>＋<input type="color" value={a.skin ?? "#e0ac86"} onChange={(e) => set({ skin: e.target.value })} style={{ display: "none" }} /></label>
+              </div>
+            </div>
+            <div>
+              <label className="f">Hair colour</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                {HAIR_COLOURS.map((c) => <button key={c} aria-label={`Hair ${c}`} onClick={() => set({ hair: c })} className="sw" style={{ background: c, boxShadow: a.hair === c ? "0 0 0 2.5px var(--ink)" : "inset 0 0 0 1px rgba(0,0,0,.12)", width: 30, height: 30 }} />)}
+              </div>
+              <label className="f">Hair length</label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {(["short", "medium", "long", "bun", "none"] as HairStyle[]).map((s) => <button key={s} className={`chip ${a.hairStyle === s ? "on" : ""}`} onClick={() => set({ hairStyle: s })}>{s === "none" ? "Bald / covered" : s[0].toUpperCase() + s.slice(1)}</button>)}
+              </div>
+            </div>
+            {p.color.season && <p className="xs muted">Colour season on your profile: {seasonByKey(p.color.season)?.name}. <button className="linkish" onClick={() => push({ t: "style", section: "color" })}>Refine colour</button></p>}
+          </section>
+
+          <section className="ctl-group">
+            <h3>Fine-tune the figure</h3>
+            {!measured && <Slider label="Build" value={startBuild} onChange={(v) => set({ build: v })} hint={a.build == null && p.basics.weight ? "from height & weight" : undefined} />}
+            <Slider label="Shoulders" value={a.shoulders} onChange={(v) => set({ shoulders: v })} />
+            <Slider label="Waist" value={a.waist} onChange={(v) => set({ waist: v })} />
+            <Slider label="Hips" value={a.hips} onChange={(v) => set({ hips: v })} />
+            <Slider label="Leg length" value={a.legs} onChange={(v) => set({ legs: v })} />
+            <button className="btn light sm" style={{ justifySelf: "start" }} onClick={() => set({ build: null, shoulders: 0, hips: 0, legs: 0, waist: 0 })}>Reset sliders</button>
+          </section>
         </div>
       </div>
     </Overlay>
@@ -187,6 +288,11 @@ export function TryOnScreen({ itemIds, name }: { itemIds: string[]; name?: strin
       <div style={{ display: "flex", justifyContent: "center", background: "var(--stage)", margin: "4px 20px 0", borderRadius: 20, padding: "8px 0" }}>
         <AvatarFigure profile={profile} items={items} width={250} label />
       </div>
+      {profile.avatar.look !== "figure" && (
+        <div className="card" style={{ margin: "10px 20px 0", padding: "10px 14px", fontSize: 13, lineHeight: 1.5 }}>
+          You’re using {profile.avatar.look === "ai" ? "an AI image" : "your photo"} as your avatar. To see these pieces on you, press <b>On my photo</b> — it dresses your saved photo (no need to upload it again).
+        </div>
+      )}
       <div className="sec" style={{ paddingTop: 12 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {items.map((i) => <button key={i.id} className="chip on" onClick={() => setIds(ids.filter((x) => x !== i.id))} aria-label={`Take off ${i.name}`}>{i.name} ✕</button>)}
@@ -223,7 +329,7 @@ export function Lineup({ looks, title }: { looks: { label: string; itemIds: stri
           const items = l.itemIds.map((i) => itemById[i]).filter(Boolean);
           return (
             <button key={k} onClick={() => push({ t: "tryon", itemIds: l.itemIds, name: l.label })} style={{ flex: "none", scrollSnapAlign: "start", background: "var(--stage)", border: 0, borderRadius: 18, padding: "8px 6px 10px", textAlign: "center" }}>
-              <AvatarFigure profile={profile} items={items} width={150} />
+              <AvatarFigure profile={{ ...profile, avatar: { ...profile.avatar, look: "figure" } }} items={items} width={150} />
               <div style={{ fontSize: 12.5, fontWeight: 600, marginTop: 4 }}>{l.label}</div>
             </button>
           );

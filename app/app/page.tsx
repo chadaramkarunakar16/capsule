@@ -49,7 +49,7 @@ function Shell() {
   const [tab, setTab] = useState<Tab>("today");
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []); // dates/locale differ between server and browser
-  const { stack, pop, push, sheet, setSheet, toastMsg, loaded } = useStore();
+  const { stack, pop, push, reset, sheet, setSheet, toastMsg, loaded } = useStore();
   // opened from "Share → Capsule": /?look=<id>
   useEffect(() => {
     if (!loaded) return;
@@ -77,7 +77,7 @@ function Shell() {
   const tabs: [Tab, string, React.ReactNode][] = [["today", "Today", I.today], ["closet", "Closet", I.closet]];
   const tabs2: [Tab, string, React.ReactNode][] = [["capsule", "Capsule", I.capsule], ["me", "Me", I.me]];
   const btn = ([id, label, icon]: [Tab, string, React.ReactNode]) => (
-    <button key={id} className={tab === id ? "on" : ""} onClick={() => setTab(id)}>{icon}{label}</button>
+    <button key={id} className={tab === id ? "on" : ""} onClick={() => { reset(); setTab(id); }}>{icon}{label}</button>
   );
   if (!mounted) return <main className="app" />;
   return (

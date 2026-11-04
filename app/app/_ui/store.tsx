@@ -50,6 +50,8 @@ type Ctx = {
   stack: Overlay[];
   push: (o: Overlay) => void;
   pop: () => void;
+  /** close every open page and dialog (used when jumping to another section) */
+  reset: () => void;
   sheet: "add" | "shop" | null;
   setSheet: (s: "add" | "shop" | null) => void;
 };
@@ -117,6 +119,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       outfits, wears, boards, loaded, refresh, toast, toastMsg, stack, sheet, setSheet,
       push: (o) => setStack((s) => [...s, o]),
       pop: () => setStack((s) => s.slice(0, -1)),
+      reset: () => { setStack([]); setSheet(null); },
     };
   }, [all, capsules, looks, wishlist, feedback, profile, outfits, wears, boards, loaded, refresh, toast, toastMsg, stack, sheet]);
 

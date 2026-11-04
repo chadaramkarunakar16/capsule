@@ -277,9 +277,43 @@ label.f { display: block; font-size: 12px; color: var(--muted); font-weight: 600
   .hero { max-width: 460px; margin-inline: auto; }
 
   /* bottom sheets become centred dialogs */
-  .scrim { align-items: center; justify-content: center; }
-  .sheet { width: min(580px, calc(100% - 48px)); max-height: min(86%, 780px); border-radius: 22px; padding: 22px 26px 26px; box-shadow: 0 24px 70px rgba(0,0,0,.28); animation: fade .15s; }
+  .scrim { align-items: flex-start; justify-content: center; padding-top: 7vh; }
+  .sheet { width: min(580px, calc(100% - 48px)); max-height: 86vh; overflow-anchor: none; scrollbar-gutter: stable; border-radius: 22px; padding: 22px 26px 26px; box-shadow: 0 24px 70px rgba(0,0,0,.28); animation: fade .15s; }
   .grab { display: none; }
   .toast { bottom: 28px; left: calc(50% + var(--side) / 2); }
 }
 @media (min-width: 1500px) { :root { --col: 1280px; } }
+
+/* ---------- side-by-side editors, grouped controls, aligned rows ---------- */
+.split { padding-top: 6px; }
+.split-fig { position: sticky; top: 0; z-index: 3; background: var(--canvas); padding: 4px 20px 10px; }
+.split-stage { display: flex; justify-content: center; background: var(--stage); border-radius: 20px; padding: 8px 0; }
+.ctl { display: grid; gap: 14px; padding: 6px 20px 24px; }
+.ctl-group { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; display: grid; gap: 16px; min-width: 0; }
+.ctl-group > h3 { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; margin: 0; }
+.linkish { background: none; border: 0; padding: 0; text-decoration: underline; font-size: inherit; }
+.my-photos .photo-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.photo-card { display: flex; gap: 14px; padding: 12px; align-items: center; }
+.photo-thumb { width: 64px; height: 84px; border-radius: 12px; background: var(--tile); display: grid; place-items: center; overflow: hidden; flex: none; font-size: 26px; color: var(--muted); }
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.photo-body { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.photo-body b { font-size: 14.5px; }
+.line { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 0; background: none; text-align: left; width: 100%; font: inherit; }
+.line > span:first-child { display: block; min-width: 0; line-height: 1.35; }
+.line > span:first-child > br { display: none; }
+.line > span:first-child > b { display: block; }
+.line > span:first-child > span { display: block; margin-top: 2px; }
+.line:hover { background: rgba(0,0,0,.025); }
+.line .pill { flex: none; }
+
+@media (min-width: 900px) {
+  .split { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr); gap: 28px; align-items: start; padding-top: 10px; }
+  .split-fig { top: 8px; padding: 0; }
+  .split-stage { padding: 14px 0; }
+  .ctl { padding: 0 0 24px; }
+  .ctl-group { padding: 18px 20px; }
+  /* Me tab: two columns of cards instead of one stretched column */
+  .scroll.cols { column-count: 2; column-gap: 28px; padding-left: max(36px, calc((100% - var(--col)) / 2)); padding-right: max(36px, calc((100% - var(--col)) / 2)); }
+  .scroll.cols > .sec { break-inside: avoid; padding-left: 0; padding-right: 0; }
+  .scroll.cols > .sec.span { column-span: all; }
+}

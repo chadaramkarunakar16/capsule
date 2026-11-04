@@ -8,7 +8,9 @@ import { AIMS, completion, normalizeProfile, status, type Profile } from "@/lib/
 import { SEASONS, seasonByKey } from "@/lib/style/seasons";
 import type { Fit } from "@/lib/style/score";
 import { hexToRgb, median, medianRgb, rgbToHex } from "@/lib/style/color";
-import { Overlay } from "./ui";
+import { Overlay, Chips } from "./ui";
+import { AvatarFigure } from "./avatar";
+import { useFigureWidth, useWide } from "./my-photos";
 import { useStore } from "./store";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -113,7 +115,9 @@ const ORDER: Section[] = ["basics", "body", "color", "face"];
 const TITLES: Record<Section, string> = { basics: "About you", body: "Proportions", color: "Colour", face: "Face shape" };
 
 export function StyleSetup({ section }: { section: "all" | Section }) {
-  const { profile, saveProfile, pop, toast } = useStore();
+  const { profile, saveProfile, pop, push, toast } = useStore();
+  const wide = useWide();
+  const figW = useFigureWidth(70);
   const steps: Section[] = section === "all" ? ORDER : [section];
   const [i, setI] = useState(0);
   const [p, setP] = useState<Profile>(() => normalizeProfile(JSON.parse(JSON.stringify(profile))));
@@ -141,25 +145,26 @@ export function StyleSetup({ section }: { section: "all" | Section }) {
         </>
       }
     >
-      {cur === "basics" && <Basics p={p} setP={setP} />}
-      {cur === "body" && <BodyStep p={p} setP={setP} />}
-      {cur === "color" && <ColourStep p={p} setP={setP} />}
-      {cur === "face" && <FaceStep p={p} setP={setP} />}
+      <div className={wide ? "split" : undefined}>
+        {wide && (
+          <div className="split-fig">
+            <div className="split-stage"><AvatarFigure profile={p} width={figW} /></div>
+            <div className="xs muted" style={{ textAlign: "center", margin: "6px 0 10px" }}>Your avatar — it updates as you answer</div>
+            <button className="btn light sm" style={{ width: "100%" }} onClick={() => push({ t: "avatar" })}>Fine-tune avatar and add photos</button>
+          </div>
+        )}
+        <div>
+          {cur === "basics" && <Basics p={p} setP={setP} />}
+          {cur === "body" && <BodyStep p={p} setP={setP} />}
+          {cur === "color" && <ColourStep p={p} setP={setP} />}
+          {cur === "face" && <FaceStep p={p} setP={setP} />}
+        </div>
+      </div>
     </Overlay>
   );
 }
 
 type SP = { p: Profile; setP: (p: Profile) => void };
-
-function Chips<T extends string>({ options, value, onPick, labels }: { options: readonly T[]; value: T | null | ""; onPick: (v: T | null) => void; labels?: Record<string, string> }) {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-      {options.map((o) => (
-        <button key={o} className={`chip ${value === o ? "on" : ""}`} onClick={() => onPick(value === o ? null : o)}>{labels?.[o] ?? cap(o)}</button>
-      ))}
-    </div>
-  );
-}
 
 function Basics({ p, setP }: SP) {
   const b = p.basics;

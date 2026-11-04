@@ -55,10 +55,24 @@ export async function trimPng(blob: Blob, max = 900): Promise<{ blob: Blob; w: n
   return { blob: await canvasToBlob(out, "image/png"), w: out.width, h: out.height };
 }
 
-/** On-device background removal (downloads a small model on first use). */
-export async function removeBg(blob: Blob): Promise<Blob> {
+/** On-device background removal. The model ships with the app (public/imgly); if it is missing it is downloaded on first use. */
+let localModel: Promise<boolean> | null = null;
+const hasLocalModel = () => (localModel ??= fetch("/imgly/resources.json", { method: "HEAD" }).then((r) => r.ok).catch(() => false));
+
+export async function removeBg(blob: Blob, onProgress?: (pct: number, what: string) => void): Promise<Blob> {
   const { removeBackground } = await import("@imgly/background-removal");
-  return removeBackground(blob, { output: { format: "image/png" } });
+  const local = await hasLocalModel();
+  const job = removeBackground(blob, {
+    ...(local ? { publicPath: `${location.origin}/imgly/`, model: "isnet_quint8" as const } : {}),
+    device: "cpu",
+    output: { format: "image/png" },
+    progress: (key: string, cur: number, total: number) => onProgress?.(total ? Math.min(1, cur / total) : 0, key),
+  });
+  // never leave the sheet spinning forever: after this the caller falls back to the original photo
+  const limit = local ? 60_000 : 180_000;
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error("Cut-out took too long")), limit); });
+  try { return await Promise.race([job, timeout]); } finally { clearTimeout(timer!); }
 }
 
 export { nameColor } from "./style/colornames";

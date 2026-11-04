@@ -24,6 +24,11 @@ export type AvatarSettings = {
   hips: number;
   legs: number;
   waist: number;
+  /** what represents you in previews: the simple figure, your own photo, or an AI image made from your photos */
+  look: "figure" | "photo" | "ai";
+  photo: string | null;       // saved full-body photo (an uploaded image name), only when you choose to keep one
+  facePhoto: string | null;   // saved face photo
+  aiImage: string | null;     // AI image made from your photos
 };
 
 export type SavedStyle = { kind: "hair" | "beard" | "glasses"; id: string; note?: string; refImage?: string };
@@ -74,7 +79,7 @@ export const EMPTY_PROFILE: Profile = {
   body: EMPTY_BODY,
   color: { season: null, auto: null, overridden: false, photos: 0, quiz: {} },
   face: { shape: null, auto: null, overridden: false, wearsGlasses: false },
-  avatar: { skin: null, hair: null, hairStyle: "short", build: null, shoulders: 0, hips: 0, legs: 0, waist: 0 },
+  avatar: { skin: null, hair: null, hairStyle: "short", build: null, shoulders: 0, hips: 0, legs: 0, waist: 0, look: "figure", photo: null, facePhoto: null, aiImage: null },
   grooming: EMPTY_GROOMING,
 };
 
