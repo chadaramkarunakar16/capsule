@@ -5,12 +5,10 @@
 **Where your data lives.** Everything you add (clothes, photos, outfits, boards, measurements, preferences) is stored on the device or computer running Capsule, in a local database and image folder. There is no Capsule account and no Capsule server.
 
 **What can leave your device.** Only when you turn on a feature that needs an outside service and add its key:
-- Google Gemini (piece details, outfit splitting, look analysis, photo try-on): the photo you chose, shrunk, and a short prompt. For try-on, your own photo and the garment images.
-- Anthropic (optional fallback): the same, if you add an Anthropic key instead.
+- Google Gemini or OpenAI (whichever key you add): the photos you choose to analyse or edit, shrunk first (pieces, outfit photos, inspiration looks, face and body photos, try-on and avatar photos), and a short text summary of your profile, closet and habits (the AI brain). Never your whole library.
 - SerpApi (shopping search): your search text and country.
-- FASHN (try-on): the garment and person photos you chose.
 - Open-Meteo (weather): approximate location coordinates.
-Face and body measurement from photos, background removal and glasses preview run in your browser; those photos are not uploaded.
+No model runs on your computer: reading faces and bodies, cut-outs, glasses and try-on are all done by the AI service you chose, for that one request, and the photo is not stored by Capsule (unless you keep it as your avatar).
 
 **Your controls.** Optional PIN; encrypted backup; Delete everything wipes the database, photos, thumbnails and offline cache (and, if you choose, saved keys).
 

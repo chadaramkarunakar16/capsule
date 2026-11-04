@@ -48,6 +48,4 @@ data/
 /.wrangler/
 /engine/routes.gen.ts
 /dist/
-/public/mediapipe/
 /tsconfig.tsbuildinfo
-/public/imgly/

@@ -24,7 +24,7 @@ self.addEventListener("fetch", (e) => {
   if (url.pathname.startsWith("/api/") && !IMG.test(url.pathname)) return; // data always comes live
 
   // Pictures and built assets never change under the same URL: cache first.
-  if (IMG.test(url.pathname) || url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname.startsWith("/mediapipe/")) {
+  if (IMG.test(url.pathname) || url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") ) {
     e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => { put(req, res); return res; })));
     return;
   }

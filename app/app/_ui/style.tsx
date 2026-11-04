@@ -1,9 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
-import { analyseFacePhoto, analyseBodyPhoto } from "@/lib/vision";
+import { analyseBodyPhoto, analyseFacePhoto, samplesOf, type FaceRead } from "@/lib/analyse";
+import { applyBodyPhoto } from "@/lib/style/apply";
 import { combine, readPhoto, type PhotoReading, type QuizAnswers } from "@/lib/style/analysis";
 import { LABELS, fromMeasurements, type Body, type Measurements } from "@/lib/style/body";
-import { FACE_BLURB, FACE_SHAPES, classifyFace, type FaceRatios, type FaceShape } from "@/lib/style/face";
+import { FACE_BLURB, FACE_SHAPES, type FaceShape } from "@/lib/style/face";
 import { AIMS, completion, normalizeProfile, status, type Profile } from "@/lib/style/profile";
 import { SEASONS, seasonByKey } from "@/lib/style/seasons";
 import type { Fit } from "@/lib/style/score";
@@ -220,10 +221,11 @@ function BodyStep({ p, setP }: SP) {
       const r = await analyseBodyPhoto(f);
       if (!r.ok) setNote(r.reason);
       else {
-        setP({ ...p, body: { ...p.body, shoulderHip: r.body.shoulderHip, torsoLeg: r.body.torsoLeg, source: "photo", ratios: r.body.ratios } });
-        setNote(["Estimated from your photo (stays on this device). Camera angle and clothing affect this — check the result below.", ...r.problems].join(" "));
+        const a = applyBodyPhoto(p, r);
+        setP(a.profile);
+        setNote(a.notes.join(" "));
       }
-    } catch (e) { setNote(e instanceof Error ? `Couldn't run the pose model: ${e.message}` : "Couldn't run the pose model."); }
+    } catch (e) { setNote(e instanceof Error ? `Couldn't read the photo: ${e.message}` : "Couldn't read the photo."); }
     setBusy(false);
   }
 
@@ -253,7 +255,7 @@ function BodyStep({ p, setP }: SP) {
             <button className="btn dark" style={{ marginTop: 10 }} disabled={busy} onClick={() => file.current?.click()}>{busy ? "Analysing…" : "Choose photo"}</button>
             <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onPhoto(f); }} />
           </div>
-          <p className="xs muted" style={{ marginTop: 8 }}>Analysed on this device. The photo is not uploaded or saved. The first run downloads a small pose model.</p>
+          <p className="xs muted" style={{ marginTop: 8 }}>Read by your AI service for this one question and not stored.</p>
         </>
       )}
       {note && <div className="card" style={{ padding: 12, marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>{note}</div>}
@@ -279,7 +281,7 @@ const QUIZ: { key: keyof QuizAnswers; q: string; opts: [string, string][] }[] = 
   { key: "contrast", q: "Hair, skin and eyes look…", opts: [["high", "Very different (high contrast)"], ["medium", "Somewhat different"], ["low", "Similar (soft blend)"]] },
 ];
 
-type Shot = { id: number; preview: string; reading: PhotoReading | null; ratios: FaceRatios | null; swatches: { skin: string; hair: string | null; eyes: string | null } | null; error?: string };
+type Shot = { id: number; preview: string; reading: PhotoReading | null; face: FaceRead | null; error?: string };
 
 function ColourStep({ p, setP }: SP) {
   const [shots, setShots] = useState<Shot[]>([]);
@@ -299,16 +301,12 @@ function ColourStep({ p, setP }: SP) {
     const c = combine(rs, quiz);
     const q = { ...cur.color, quiz, photos: rs.length };
     let face = cur.face;
-    const ratios = next.map((s) => s.ratios).filter((r): r is FaceRatios => !!r);
-    if (ratios.length) {
-      const med = { lengthToWidth: median(ratios.map((r) => r.lengthToWidth)), foreheadToCheek: median(ratios.map((r) => r.foreheadToCheek)), jawToCheek: median(ratios.map((r) => r.jawToCheek)), chinAngle: median(ratios.map((r) => r.chinAngle)) };
-      const g = classifyFace(med);
-      face = { ...face, auto: { shape: g.shape, confidence: g.confidence, alternatives: g.alternatives }, shape: face.overridden || face.shape ? face.shape : g.shape };
-    }
+    const reads = next.map((s) => s.face).filter((f): f is FaceRead => !!f);
+    const best = [...reads].filter((f) => f.shape).sort((a, b) => b.confidence - a.confidence)[0];
+    if (best?.shape) face = { ...face, auto: { shape: best.shape, confidence: best.confidence, alternatives: best.alternatives }, shape: face.overridden || face.shape ? face.shape : best.shape };
     // photo-derived starting colours for the avatar (never overwrite what the user chose)
-    const sw = next.map((s) => s.swatches).filter((x): x is NonNullable<typeof x> => !!x);
     const hex = (list: (string | null)[]) => { const l = list.filter((h): h is string => !!h).map(hexToRgb); return l.length ? rgbToHex(medianRgb(l)) : null; };
-    const avatar = { ...cur.avatar, skin: cur.avatar.skin ?? hex(sw.map((x) => x.skin)), hair: cur.avatar.hair ?? hex(sw.map((x) => x.hair)) };
+    const avatar = { ...cur.avatar, skin: cur.avatar.skin ?? hex(reads.map((x) => x.skin)), hair: cur.avatar.hair ?? hex(reads.map((x) => x.hair)) };
     if (c && !cur.color.overridden) setP({ ...cur, face, avatar, color: { ...q, season: c.key, auto: { key: c.key, confidence: c.confidence, alternatives: c.alternatives } } });
     else setP({ ...cur, face, avatar, color: q });
   }
@@ -322,10 +320,10 @@ function ColourStep({ p, setP }: SP) {
       try {
         const r = await analyseFacePhoto(f);
         next = r.ok
-          ? [...next, { id, preview, reading: readPhoto(r.samples), ratios: r.ratios, swatches: r.swatches }]
-          : [...next, { id, preview, reading: null, ratios: null, swatches: null, error: r.reason }];
+          ? [...next, { id, preview, reading: readPhoto(samplesOf(r)), face: r }]
+          : [...next, { id, preview, reading: null, face: null, error: r.reason }];
       } catch (e) {
-        next = [...next, { id, preview, reading: null, ratios: null, swatches: null, error: e instanceof Error ? `Couldn't run the face model: ${e.message}` : "Couldn't run the face model." }];
+        next = [...next, { id, preview, reading: null, face: null, error: e instanceof Error ? `Couldn't read the photo: ${e.message}` : "Couldn't read the photo." }];
       }
       setShots(next);
     }
@@ -352,7 +350,7 @@ function ColourStep({ p, setP }: SP) {
         Colour analysis from a photo is a best guess — screens and lighting distort colour. We cross-check up to three photos and a short quiz, tell you how sure we are, and you always have the final say.
       </p>
       <div className="card" style={{ padding: 12, fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
-        <b>For best results:</b> daylight by a window, no makeup, no filters, hair pulled back from your face, plain top, face the camera. Photos are analysed on this device and never saved.
+        <b>For best results:</b> daylight by a window, no makeup, no filters, hair pulled back from your face, plain top, face the camera. Photos are read by your AI service for one question and never stored.
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -360,7 +358,7 @@ function ColourStep({ p, setP }: SP) {
           <div key={s.id} style={{ position: "relative", width: 92 }}>
             <img src={s.preview} alt="" style={{ width: 92, height: 112, objectFit: "cover", borderRadius: 14, background: "#eee" }} />
             <button className="rm" style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", background: "rgba(255,255,255,.92)", border: 0, fontSize: 11 }} aria-label="Remove photo" onClick={() => removeShot(s.id)}>✕</button>
-            {s.swatches && <div style={{ display: "flex", gap: 3, marginTop: 4 }}><Dot c={s.swatches.skin} /><Dot c={s.swatches.hair} /><Dot c={s.swatches.eyes} /></div>}
+            {s.face && <div style={{ display: "flex", gap: 3, marginTop: 4 }}><Dot c={s.face.skin} /><Dot c={s.face.hair} /><Dot c={s.face.eyes} /></div>}
           </div>
         ))}
         {shots.length < 3 && (
@@ -371,7 +369,7 @@ function ColourStep({ p, setP }: SP) {
         <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; addPhotos(fs); }} />
       </div>
       {shots.some((s) => s.error) && <div className="xs" style={{ color: "var(--danger)", marginBottom: 8, lineHeight: 1.5 }}>{shots.filter((s) => s.error).map((s) => s.error).join(" ")}</div>}
-      {busy && <div className="xs muted" style={{ marginBottom: 8 }}>Reading your photo… the first run downloads a small face model.</div>}
+      {busy && <div className="xs muted" style={{ marginBottom: 8 }}>Reading your photo…</div>}
 
       <button className="chip" onClick={() => setQuizOpen(!quizOpen)}>{quizOpen ? "Hide" : "Add"} the 6-question quiz {p.color.quiz && Object.values(p.color.quiz).filter(Boolean).length ? `(${Object.values(p.color.quiz).filter(Boolean).length} answered)` : ""}</button>
       {quizOpen && (

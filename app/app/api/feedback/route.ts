@@ -1,3 +1,4 @@
+import { itemBit, note } from "@/lib/brain/events";
 import { all, fail, ok, run, uid } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -24,6 +25,8 @@ export async function POST(req: Request) {
     "INSERT INTO feedback (id,item_ids,rating,tags,context) VALUES (?,?,?,?,?)",
     id, JSON.stringify(b.itemIds), b.rating, JSON.stringify(Array.isArray(b.tags) ? b.tags : []), String(b.context ?? ""),
   );
+  const pieces = all(`SELECT name, category, color_name, fit FROM items WHERE id IN (${b.itemIds.map(() => "?").join(",")})`, ...b.itemIds).map((r) => itemBit(r));
+  note("feedback", { rating: b.rating, tags: Array.isArray(b.tags) ? b.tags : [], context: String(b.context ?? "").slice(0, 80), pieces });
   return ok({ id }, 201);
 }
 

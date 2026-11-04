@@ -1,4 +1,4 @@
-# Capsule — Phases 1–6 (local web app)
+# Capsule — personal wardrobe and styling app
 
 Closet, outfits, boards and a wear calendar. Everything is stored on your machine.
 
@@ -12,22 +12,28 @@ npm run dev        # http://localhost:3000
 Needs Node 22.5+ (uses the built-in `node:sqlite`). Data lives in `data/` (git-ignored):
 `data/capsule.db` and `data/uploads/`.
 
-## AI tagging (optional)
+## AI everywhere, nothing installed
 
-Without a key, Capsule guesses colour and category on-device and you fix the rest in the review queue.
-With a key, Claude reads each photo and fills in name, category, colour, fit, pattern, formality, season.
+Every smart feature runs on **your own AI key** (Google Gemini or OpenAI, chosen in *Me → AI*). Nothing runs on your computer: no downloaded models, no on-device vision. Reading a piece, reading your face and body photos, outfit splitting, inspiration looks, the stylist, try-on, glasses on your photo, clean cut-outs, the picture of you and the AI brain all go through the one key. Without a key the app still works as a manual wardrobe, and says what to add when a feature needs one.
 
-Set the key in the app (**Me → AI tagging**) or via the environment:
+Set it in the app (**Me → AI**; keys are stored only on your PC and never shown) or by environment variable: `GEMINI_API_KEY=... npm run dev` or `OPENAI_API_KEY=...`.
 
-```bash
-ANTHROPIC_API_KEY=sk-ant-... npm run dev
-```
+### One AI brain
+All features share one memory (`lib/brain/`). The app records small facts about how you use it (pieces you confirm or correct, outfits you like or pass on, what you wear, save, shop and ask) and, once enough has happened, the AI itself rewrites a short portrait of your taste with rules to follow. That portrait, plus a summary of your closet, goes in front of every AI call, so tagging, looks, advice and outfits improve together. For example, if you keep changing "overshirt" from Tops to Outerwear, the next tagging prompt is told to do it your way. *Me → AI brain* shows what it has learned, and lets you pause it, refresh it or erase it. Only short text notes are shared with the AI, never photos.
 
-Model defaults to `claude-haiku-5-5`; override with `CAPSULE_TAG_MODEL`.
+### Models by job (the smallest that does each job)
+| Job | Gemini Economy | OpenAI Economy | Better quality |
+|---|---|---|---|
+| **read** (tag a piece, read a face or body photo, brain notes) | `gemini-3.5-flash-lite` | `gpt-6-luna` | same |
+| **think** (split an outfit photo, read a look, stylist advice) | `gemini-3.5-flash-lite` | `gpt-6-luna` | `gemini-3.6-flash` / `gpt-6.1-terra` |
+| **edit** (try-on, glasses, clean cut-outs) | `gemini-2.5-flash-image` | `gpt-image-2.5-flare` | `gemini-3.1-flash-image` / `gpt-image-2.5-sunburst` |
+| **likeness** (the picture of you) | `gemini-3.1-flash-image` | `gpt-image-2.5-sunburst` | same |
+
+Three models on Economy for either provider. Thinking is kept minimal, photos are shrunk before sending, and single pieces use the lowest image detail. Prices are in `lib/ai/routing.ts` (checked Nov 2026; Gemini 3.6 Flash is half price until 31 Dec 2026). The AI calls are covered by tests against mock servers, not live keys.
 
 ## What's in Phase 1
 
-- **Add photos** (+): bulk upload → on-device background removal (`@imgly/background-removal`, model downloads on first use) → tagging → review queue (duplicate hints) → closet.
+- **Add photos** (+): bulk upload → AI tagging → review queue (duplicate hints) → closet. An optional *Clean AI cut-out* puts each piece alone on a plain background (about 4¢ each).
 - **Closet**: search, category filter, sort, item detail (edit everything, price, cost-per-wear, wears), delete.
 - **Outfits**: manual builder, save, "wore it today".
 - **Boards**: Pinterest-style masonry; save closet items, outfits, or inspiration images with a note and source link.
@@ -46,12 +52,11 @@ Model defaults to `claude-haiku-5-5`; override with `CAPSULE_TAG_MODEL`.
 **Me → Your style profile** walks through four short steps (all optional, all editable):
 
 - **About you**: height, optional weight (kept for the avatar later, never used to score clothes), fit preference, what you want clothes to do.
-- **Proportions**: tape measurements, a full-body photo (MediaPipe pose, on-device), or just describe yourself. Neutral wording only.
-- **Colour**: up to 3 face photos (skin, hair and eye colour sampled on-device) plus a 6-question quiz → one of 12 seasons with a confidence score, runner-up seasons, and a manual override. Disagreeing photos lower the confidence.
-- **Face shape**: from a photo (MediaPipe face mesh) or pick it yourself.
+- **Proportions**: tape measurements, a full-body photo (read by your AI service), or just describe yourself. Neutral wording only.
+- **Colour**: up to 3 face photos (the AI reads skin, hair and eye colour) plus a 6-question quiz → one of 12 seasons with a confidence score, runner-up seasons, and a manual override. Disagreeing photos lower the confidence.
+- **Face shape**: from a photo (read by your AI service) or pick it yourself.
 
-Photos are analysed in the browser and **never uploaded or stored**; only the derived numbers and choices are saved (`profile` table).
-First use downloads two small MediaPipe models (face ≈ 4 MB, pose ≈ 6 MB) from Google's public model bucket via `/api/model/*`; they're cached in `data/models/` afterwards.
+Photos are sent to your AI service for that one question and **not stored**; only the derived choices are saved (`profile` table), unless you keep a photo as your avatar.
 
 Where it shows up: a **"How it suits you"** card with reasons on every item, a live score on the outfit builder (occasion changes the dressiness target), ★ badges and a "Suits you" sort in the closet, and **Me → My palette**.
 Neckline, rise and length (item page) sharpen the advice; AI tagging fills them in automatically.
@@ -69,7 +74,7 @@ The rules live in `lib/style/*` (pure TypeScript, no DOM) and are covered by `np
 - **Customize:** dark swipe-row editor — swipe outerwear / tops / bottoms / shoes / bags; the score and reasons update live and each tile shows the score you'd get by choosing it.
 - **Wear today / Plan… / Save:** log it, plan it for one of the next 7 days (shows as a dashed day on the calendar; "I wore this" confirms it), or save it to Outfits. Planned looks don't count as wears until confirmed.
 - **Capsule tab:** *Rediscover* (new ways to wear rarely-worn pieces) and *Closet review* (keep / try styling differently / consider passing on — a gentle nudge, never deletes anything).
-- **Outfit photo** (+ → Outfit photo): a mirror selfie is split into its pieces; each is cropped, cut out and saved as a draft. Needs an Anthropic key.
+- **Outfit photo** (+ → Outfit photo): a mirror selfie is split into its pieces; each is cropped, cut out and saved as a draft. Uses your AI key.
 
 The generator is `lib/style/generate.ts` (beam search over top × bottom × shoes × layer × bag, pure TypeScript, covered by `npm test`).
 
@@ -77,7 +82,7 @@ The generator is `lib/style/generate.ts` (beam search over top × bottom × shoe
 
 **+ → Shop a look** (or Closet → Shop, or a board image → "Find these pieces", or **Share → Capsule** once installed as an app).
 
-1. Add a screenshot of an outfit you love. With an Anthropic key Capsule lists the pieces automatically; without one you add them yourself (name, colour, fit) in a few taps.
+1. Add a screenshot of an outfit you love. With an AI key Capsule lists the pieces automatically; without one you add them yourself (name, colour, fit) in a few taps.
 2. **Do I already own it?** Each piece is compared with your closet. Close matches show "You already own this" — you can still choose to shop for one.
 3. **Find the rest.** Every piece gets store-search links for your country (Myntra, Ajio, Amazon, Flipkart, ASOS, Zara… — plain links, no tracking, no affiliate tags). Paste any product link and Capsule reads the price and rating the page itself publishes (schema.org / Open Graph).
 4. **Live results (optional):** add a SerpApi key under **Me → Shopping** to pull Google Shopping results — price, rating, review count, store. Results are ranked by how well the title matches, colour, rating, and how well the colour suits you, and tagged *Best match* / *Budget pick*, *In your palette*, and *+N outfits* (good outfits it would add to what you own).
@@ -109,7 +114,7 @@ How it works: `lib/style/capsule.ts` — greedy selection with swap refinement o
 
 **Side by side.** In a trip or capsule, *See them on my avatar* lines up every day's look.
 
-**On my photo (optional, paid).** Add a FASHN key under *Me → Photo try-on*. Upload a full-body photo and Capsule puts your tops, bottoms or dress on *you* (pieces are applied one after another). Needs an explicit consent tick; your photo is sent to FASHN only when you press the button and is never stored here — only the result image is kept (and can be saved to a board). Outerwear, shoes and bags aren't supported by this model yet. Env var: `FASHN_API_KEY`.
+**On my photo (uses your AI key).**  Upload a full-body photo and Capsule puts your tops, bottoms or dress on *you* (pieces are applied one after another). Needs an explicit consent tick; your photo is sent to your AI service only when you press the button and is never stored here — only the result image is kept (and can be saved to a board). Outerwear, shoes and bags aren't supported by this model yet. Env var: `FASHN_API_KEY`.
 
 Not built: a 3D avatar (Phase 5c) — see the plan.
 
@@ -139,29 +144,17 @@ Capsule installs like normal PC software: a window with a sidebar, a Desktop and
 - **My avatar and face** (Me tab): the live avatar sits beside the controls, so every change is visible as you make it. Add a face photo and a full-body photo; they fill in face shape, skin tone, hair colour, a first colour estimate and your proportions, shared with the style-profile questions (they read and write the same data).
 - **How I appear:** choose the simple figure, your own photo (kept on your PC only if you press "Use as my avatar"), or an AI image made from your photos by a Gemini image model. With a photo avatar, "On my photo" try-on starts from your saved photo.
 - **API keys are never shown.** Not even the last characters: a saved key appears as "saved · hidden" with **Edit key** and **Remove** (Me → AI, Your stylist, and Privacy & data).
-- **Offline cut-outs:** the background-removal model is downloaded into `public/imgly` by `npm run dev/build` (and the desktop build), so adding photos works offline and starts instantly.
+- **No local models:** nothing is downloaded or run on your computer; cut-outs, face and body reading, glasses and try-on all use your AI key.
 
 ### Stylist knowledge layer
 `lib/knowledge/` holds Capsule's styling knowledge in one place: what hairstyles, beards, glasses and sunglasses suit each face shape; how a lean, average or fuller build, and a shorter or taller height, change what to wear (lean frames get layering, textured mid-weight fabrics and shoulder structure; fuller frames get tonal lines and structured mid-weight pieces); colour and skin-tone guidance; and healthy grooming basics. It was cross-checked against published eyewear and men's/women's style guides. It is used twice: the outfit scoring (`lib/style/score.ts`) and the grooming engine apply the same rules, and `brief()` turns the parts that apply to *you* into a short briefing that the AI reads **before** it answers (Me → Your stylist). The AI may only choose styles that exist in Capsule and closet pieces you own, so every suggestion can be opened and acted on. If you keep a face photo, the stylist can also look at it (sent to Google only when you ask).
-
-### AI (your own Gemini key)
-Me → AI: paste a Gemini API key. Features pick the cheapest model that does the job (prices per 1M tokens, input / output; photo try-on per image):
-
-| Feature | Economy (default) | Better |
-|---|---|---|
-| Piece details from one photo | `gemini-3.1-flash-lite` (0.25 / 1.50) | `gemini-3.5-flash-lite` (0.30 / 2.50) |
-| Splitting an outfit photo, reading inspiration looks | `gemini-3.5-flash-lite` | `gemini-3.6-flash` (0.75 / 3.75) |
-| Stylist advice | `gemini-3.5-flash-lite` | `gemini-3.6-flash` |
-| Photo try-on | `gemini-2.5-flash-image` (~$0.039 per image) | `gemini-3.1-flash-image` (~$0.067 per image) |
-
-Thinking is set to minimal, photos are shrunk before sending (768 px for single pieces, 1280 px otherwise) and single-garment photos use the lowest image detail. The settings card shows this month's call count. FASHN remains an optional alternative for try-on. Prices come from Google's pricing page as of Nov 2026 and change; the Gemini calls were tested against a mock server, not a live key.
 
 ## Other ways to run it
 
 1. **Local (Node server)** — `npm run dev`. Data in `app/data/` (SQLite + photos). Optional PIN, `npm run lan` for your phone.
 2. **Hosted PWA (Cloudflare Pages)** — local-first: the whole "server" runs inside the browser.
    - `engine/` bundles Capsule's own API routes into a worker (`public/engine/worker.js`) running **SQLite-wasm in the browser's private file system** (OPFS). Photos are stored in the same database, so one file holds everything. `lib/api.ts` talks to it instead of the network (`NEXT_PUBLIC_ENGINE=browser`).
-   - The only server code is `functions/proxy.ts` (`relay/relay.ts`): a stateless relay for calls other sites block from browsers (shopping search, Anthropic, FASHN, merchant pages). It stores and logs nothing, only forwards, refuses private/local addresses, accepts GET only for ordinary sites, and rejects cross-site callers. Your API keys live in your browser and pass through it per request.
+   - The only server code is `functions/proxy.ts` (`relay/relay.ts`): a stateless relay for calls other sites block from browsers (shopping search, Gemini, OpenAI, merchant pages). It stores and logs nothing, only forwards, refuses private/local addresses, accepts GET only for ordinary sites, and rejects cross-site callers. Your API keys live in your browser and pass through it per request.
    - Try it: `npm run dev:browser` (localhost:3000, browser engine), or `npm run build:static` then `npm run preview:static` (Cloudflare's own runtime locally).
    - Deploy: `npx wrangler login` once, then `npm run deploy` (or connect the repo to Cloudflare Pages with build command `npm run build:static` and output directory `out`).
    - Data stays on that device and browser; it does not sync. Use *Privacy & data → encrypted backup* to move it. One window at a time may open the library.

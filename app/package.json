@@ -10,8 +10,6 @@
     "dev:browser": "node scripts/build-engine.mjs && cross-env NEXT_PUBLIC_ENGINE=browser next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start -H 127.0.0.1",
-    "predev": "node scripts/copy-wasm.mjs && node scripts/fetch-imgly.mjs",
-    "prebuild": "node scripts/copy-wasm.mjs && node scripts/fetch-imgly.mjs",
     "test": "tsx --test tests/*.test.ts",
     "lan": "node scripts/lan.mjs",
     "icons": "node scripts/make-icons.mjs",
@@ -21,9 +19,6 @@
     "desktop:dist": "npm run desktop:build && electron-builder --win nsis"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.4.0",
-    "@imgly/background-removal": "^1.7.0",
-    "@mediapipe/tasks-vision": "^1.2.0",
     "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
     "next": "16.4.4",
     "react": "19.3.0",

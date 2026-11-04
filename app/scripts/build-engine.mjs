@@ -26,7 +26,7 @@ await build({
     "@/lib/db": e("db.ts"),
     "@/lib/auth": e("auth.ts"),
     sharp: e("shims/empty.ts"),
-    "node:module": e("shims/empty.ts"),
+    "node:module": e("shims/module.ts"),
     "node:net": e("shims/net.ts"),
     "node:dns/promises": e("shims/dns.ts"),
   },

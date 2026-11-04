@@ -1,3 +1,5 @@
+> **Note:** this is the original research and plan. Where it names on-device models (MediaPipe, background removal) or a specific vision provider, the built app has since moved to a single AI key (Gemini or OpenAI) with no local models: see `app/README.md`.
+
 # Capsule — Market Research & Phased Build Plan
 
 *Researched 3 Nov 2026. Sources: app-store/Play listings, Reddit r/capsulewardrobe, Wirecutter, comparison blogs, GitHub. Claims from competitor-run blogs (Wdrobe, Tone & Fit, Wardrowbe, Nouva) are biased and are marked as such.*

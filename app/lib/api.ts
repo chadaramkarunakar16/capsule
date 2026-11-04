@@ -81,10 +81,16 @@ export const api = {
 
   advice: (b: { topic: "grooming" | "outfits"; occasion?: string; useFacePhoto?: boolean; useBodyPhoto?: boolean }) => req<{ available: boolean; usedPhoto?: boolean; advice?: Advice }>("/api/advice", send("POST", b)),
 
+  analyse: (b: { kind: "face"; image: string } | { kind: "body"; image: string }) => req<FaceAnalysis | BodyAnalysis | { available: false }>("/api/analyse", send("POST", b)),
+  cutout: (image: string) => req<{ available: boolean; image?: string }>("/api/cutout", send("POST", { image })),
+  glasses: (b: { photo: string; frame: string; colour: string }) => req<{ available: boolean; image?: string }>("/api/glasses", send("POST", b)),
+  brain: () => req<BrainState>("/api/brain"),
+  brainAct: (b: { action: "reflect" | "forget" } | { action: "toggle"; enabled: boolean }) => req<BrainState>("/api/brain", send("POST", b)),
+
   tryon: (b: { person: string; garments: { image: string; category: string }[] }) => req<{ available: boolean; image?: string; steps?: number; provider?: string }>("/api/tryon", send("POST", b)),
 
-  inventory: () => req<{ rows: Record<string, number>; profile: boolean; photos: { files: number; bytes: number }; thumbs: { files: number; bytes: number }; models: { files: number; bytes: number }; keys: { anthropic: boolean; serpapi: boolean; fashn: boolean }; pin: boolean }>("/api/privacy/inventory"),
-  wipe: async (b: { confirm: string; keys?: boolean; models?: boolean }) => {
+  inventory: () => req<{ rows: Record<string, number>; profile: boolean; photos: { files: number; bytes: number }; thumbs: { files: number; bytes: number }; keys: { gemini: boolean; openai: boolean; serpapi: boolean }; pin: boolean }>("/api/privacy/inventory"),
+  wipe: async (b: { confirm: string; keys?: boolean }) => {
     const r = await req<{ ok: boolean; removed: { photos: number } }>("/api/privacy/wipe", send("POST", b));
     // the offline copy of pictures and pages goes too
     try { (await navigator.serviceWorker?.getRegistration())?.active?.postMessage("wipe"); } catch { /* no service worker */ }
@@ -95,8 +101,8 @@ export const api = {
   logout: () => req("/api/auth/logout", send("POST")),
   exportAll: () => req<unknown>("/api/export"),
 
-  settings: () => req<{ aiProvider: "gemini" | "anthropic" | null; geminiHint: string | null; geminiFromEnv: boolean; aiQuality: "economy" | "better"; aiModels: Record<"economy" | "better", Record<"tag" | "split" | "look" | "advice", string>>; aiUsage: { calls: number; inTok: number; outTok: number; byModel: Record<string, number> }; tryonAvailable: boolean; tryonProvider: "gemini" | "fashn" | null; tryonHasFashn: boolean; tryonHasGemini: boolean; tryonModel: string; tryonKeyHint: string | null; tryonKeyFromEnv: boolean; aiAvailable: boolean; keyHint: string | null; keyFromEnv: boolean; model: string; country: string; shopAvailable: boolean; shopKeyHint: string | null; shopKeyFromEnv: boolean }>("/api/settings"),
-  saveSettings: (b: { tryonProvider?: "gemini" | "fashn"; geminiKey?: string; aiQuality?: "economy" | "better"; fashnKey?: string; anthropicKey?: string; model?: string; serpApiKey?: string; country?: string }) => req("/api/settings", send("POST", b)),
+  settings: () => req<Settings>("/api/settings"),
+  saveSettings: (b: { geminiKey?: string; openaiKey?: string; aiProvider?: "gemini" | "openai"; aiQuality?: "economy" | "better"; serpApiKey?: string; country?: string }) => req("/api/settings", send("POST", b)),
   importData: (data: unknown) => req<{ items: number; outfits: number; boards: number }>("/api/import", send("POST", data)),
 };
 
@@ -104,4 +110,32 @@ export type Advice = {
   summary: string;
   hair?: { id: string; why: string }[]; beard?: { id: string; why: string }[]; glasses?: { id: string; why: string }[]; sunglasses?: string; tips?: string[];
   do?: string[]; avoid?: string[]; outfits?: { name: string; items: string[]; why: string }[];
+};
+
+export type Settings = {
+  aiAvailable: boolean; aiProvider: "gemini" | "openai" | null; aiProviderName: string | null;
+  hasGemini: boolean; hasOpenai: boolean; geminiFromEnv: boolean; openaiFromEnv: boolean; aiChoice: "gemini" | "openai" | null;
+  aiQuality: "economy" | "better";
+  aiRoutes: Record<"gemini" | "openai", Record<"economy" | "better", Record<"read" | "think" | "edit" | "likeness", string>>>;
+  aiUsage: { calls: number; inTok: number; outTok: number; byModel: Record<string, number> };
+  country: string; shopAvailable: boolean; shopKeyFromEnv: boolean;
+  geminiHint: string | null; openaiHint: string | null;
+};
+
+export type FaceAnalysis = {
+  available: true; ok: true;
+  shape: "oval" | "round" | "square" | "oblong" | "heart" | "diamond" | null; confidence: number; alternatives: ("oval" | "round" | "square" | "oblong" | "heart" | "diamond")[];
+  skin: string; hair: string | null; eyes: string | null;
+  hairType: "straight" | "wavy" | "curly" | "coily" | null; hairDensity: "thin" | "medium" | "thick" | null; receding: boolean;
+  wearsGlasses: boolean; facialHair: "none" | "stubble" | "moustache" | "beard"; lighting: "good" | "ok" | "poor"; notes: string;
+} | { available: true; ok: false; reason: string };
+export type BodyAnalysis = {
+  available: true; ok: true;
+  shoulderHip: "broader-shoulders" | "balanced" | "broader-hips" | null; torsoLeg: "longer-torso" | "balanced" | "longer-legs" | null; waist: "defined" | "straight" | null;
+  buildEstimate: number; problems: string[]; notes: string;
+} | { available: true; ok: false; reason: string };
+
+export type BrainState = {
+  enabled: boolean; aiReady: boolean; events: number; newSince: number; byKind: Record<string, number>; corrections: string[]; since: string | null;
+  memory: { summary: string; likes: string[]; dislikes: string[]; rules: string[]; tagHints: string[]; updatedAt: string; eventsSeen: number } | null;
 };

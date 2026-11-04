@@ -6,16 +6,15 @@ import { Collage, I, Ico, Tile, fmtDate, iso, money, today, Img, SecretKey } fro
 import { NewBoardSheet } from "./boards";
 import { SetupBanner, StyleHub } from "./style";
 import { ClosetReview, Rediscover, StyleMeCard } from "./stylist";
-import { ShopSection, ShoppingSettings } from "./shop";
+import { ShopSection, ShoppingSettings, ToBuyCard, useWanted } from "./shop";
 import { InsightsPlus, PlansSection } from "./capsule";
 import { AvatarCard } from "./avatar";
 import { GroomingCard } from "./grooming";
 import { PrivacyCard } from "./privacy";
-import { TryOnSettings } from "./avatar-photo";
+import { AiCard, BrainCard } from "./ai-settings";
 import { itemFit } from "@/lib/style/score";
 import { useStore } from "./store";
 import { StylistCard } from "./advice";
-import { GeminiKeyField } from "./gemini-key";
 
 /* ============================== TODAY ============================== */
 export function TodayTab() {
@@ -141,7 +140,8 @@ const SORTS = [
 ] as const;
 
 export function ClosetTab() {
-  const { items, drafts, outfits, boards, itemById, push, setSheet, loaded, profile } = useStore();
+  const { items, drafts, outfits, boards, itemById, push, setSheet, loaded, profile, looks } = useStore();
+  const toBuy = useWanted().filter((w) => !w.own);
   const [view, setView] = useState<"items" | "outfits" | "boards" | "shop">("items");
   const [cat, setCat] = useState("All");
   const [q, setQ] = useState("");
@@ -167,12 +167,18 @@ export function ClosetTab() {
       </div>
       <div className="seg">
         {(["items", "outfits", "boards", "shop"] as const).map((v) => (
-          <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v[0].toUpperCase() + v.slice(1)}</button>
+          <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v === "shop" ? "Inspo & buy" : v[0].toUpperCase() + v.slice(1)}</button>
         ))}
       </div>
       <div className="scroll">
         {view === "items" && (
           <>
+            {(looks.length > 0 || toBuy.length > 0) && (
+              <button className="card" style={{ margin: "12px 20px 0", padding: "12px 16px", width: "calc(100% - 40px)", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left", background: "#f4efff", borderColor: "#e3d9fb" }} onClick={() => setView("shop")}>
+                <span><b>Inspiration &amp; to buy</b><br /><span className="xs muted">{looks.length} look{looks.length === 1 ? "" : "s"} you’re into · {toBuy.length} piece{toBuy.length === 1 ? "" : "s"} to buy</span></span>
+                <span>{I.chev}</span>
+              </button>
+            )}
             {drafts.length > 0 && (
               <button className="card" style={{ margin: "12px 20px 0", padding: "12px 16px", width: "calc(100% - 40px)", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left", background: "#fff8ea", borderColor: "#f1deb2" }} onClick={() => push({ t: "review" })}>
                 <span><b>{drafts.length} item{drafts.length > 1 ? "s" : ""} to review</b><br /><span className="xs muted">Confirm tags to add them to your closet</span></span>
@@ -273,7 +279,7 @@ export function CapsuleTab() {
         <button className={view === "insights" ? "on" : ""} onClick={() => setView("insights")}>Insights</button>
       </div>
       <div className="scroll">
-        {view === "plans" ? <PlansSection /> : items.length === 0 ? (
+        {view === "plans" ? <><ToBuyCard /><PlansSection /></> : items.length === 0 ? (
           <div className="empty"><h3>Nothing to analyse yet</h3>Add items and log what you wear — Capsule will show cost-per-wear, what you never wear, and your category mix.</div>
         ) : (
           <>
@@ -366,7 +372,7 @@ export function MeTab() {
         <div className="sec">
           <h3>Your style profile</h3>
           <StyleHub />
-          <p className="xs muted" style={{ marginTop: 8, lineHeight: 1.5 }}>Photos are analysed on this device and never saved — only the results are kept.</p>
+          <p className="xs muted" style={{ marginTop: 8, lineHeight: 1.5 }}>Photos are read by your AI service for one question and not stored — only the results are kept.</p>
         </div>
         <PrivacyCard />
         <StylistCard />
@@ -374,39 +380,8 @@ export function MeTab() {
         <GroomingCard />
         <TasteCard />
         <ShoppingSettings />
-        <TryOnSettings />
-        <div className="sec">
-          <h3>AI (Gemini)</h3>
-          <div className="card" style={{ padding: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <b style={{ fontSize: 15 }}>{st?.aiAvailable ? "Connected" : "Not connected"}</b>
-              <span className={`pill ${st?.aiAvailable ? "ai" : "guess"}`}>{st?.aiProvider === "gemini" ? "Gemini · key saved" : st?.aiProvider === "anthropic" ? "Claude (fallback)" : "Using local colour guess"}</span>
-            </div>
-            <p className="xs muted" style={{ margin: "8px 0 10px", lineHeight: 1.5 }}>
-              Paste your own Gemini API key (from Google AI Studio). Every AI feature uses it: filling in a piece’s details, splitting an outfit photo, and reading inspiration looks. Without a key Capsule guesses colour and category on this computer. The key is stored only on this computer; photos go to Google only when you use one of those features.
-            </p>
-            <GeminiKeyField onChange={async () => setSt(await api.settings())} />
-            <div style={{ marginTop: 14 }}>
-              <b style={{ fontSize: 13 }}>Quality</b>
-              <div className="chips" style={{ padding: 0, margin: "6px 0" }}>
-                {(["economy", "better"] as const).map((q) => (
-                  <button key={q} className={`chip ${st?.aiQuality === q ? "on" : ""}`} onClick={async () => { await api.saveSettings({ aiQuality: q }); setSt(await api.settings()); }}>{q === "economy" ? "Economy (default)" : "Better"}</button>
-                ))}
-              </div>
-              {st && (
-                <p className="xs muted" style={{ lineHeight: 1.6 }}>
-                  Each feature uses the cheapest model that does the job:<br />
-                  Piece details — <code>{st.aiModels[st.aiQuality].tag}</code><br />
-                  Outfit photo split — <code>{st.aiModels[st.aiQuality].split}</code><br />
-                  Inspiration looks — <code>{st.aiModels[st.aiQuality].look}</code><br />
-                  Stylist advice — <code>{st.aiModels[st.aiQuality].advice}</code><br />
-                  “Better” moves outfit and look photos to a stronger model — still a few cents per hundred photos, but about 2–3× Economy.
-                </p>
-              )}
-              {st && st.aiUsage.calls > 0 && <p className="xs muted" style={{ marginTop: 6 }}>This month: {st.aiUsage.calls} AI calls, about {Math.round((st.aiUsage.inTok + st.aiUsage.outTok) / 1000)}k tokens.</p>}
-            </div>
-          </div>
-        </div>
+        <AiCard />
+        <BrainCard />
         <div className="sec">
           <h3>Your data</h3>
           <div className="card">

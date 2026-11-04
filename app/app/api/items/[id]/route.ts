@@ -1,3 +1,4 @@
+import { itemBit, note } from "@/lib/brain/events";
 import fs from "node:fs";
 import path from "node:path";
 import { ITEM_SELECT, UPLOAD_DIR, fail, get, mapItem, ok, run } from "@/lib/db";
@@ -45,15 +46,24 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/items/[id]">) 
     vals.push(JSON.stringify(b.attrs ?? {}));
   }
   if (!sets.length) return fail("nothing to update");
+  const prev = get("SELECT * FROM items WHERE id = ?", id);
   run(`UPDATE items SET ${sets.join(", ")} WHERE id = ?`, ...vals, id);
+  if (prev) {
+    // what the person changed on a piece the AI labelled teaches the brain how they name and sort things
+    const fields: [string, string, string][] = [["name", "name", "name"], ["category", "category", "category"], ["colour", "colorName", "color_name"], ["fit", "fit", "fit"], ["pattern", "pattern", "pattern"]];
+    const changes = prev.ai_tagged ? fields.filter(([, k, col]) => k in b && String(b[k] ?? "") !== String(prev[col] ?? "")).map(([f, k, col]) => ({ field: f, from: prev[col], to: b[k] })) : [];
+    if (changes.length) note("item.corrected", { name: b.name ?? prev.name, changes });
+    if (prev.status === "draft" && b.status === "active") note("item.confirmed", { piece: itemBit({ ...prev, ...b, name: b.name ?? prev.name, color_name: b.colorName ?? prev.color_name }), aiTagged: !!prev.ai_tagged, corrected: changes.length > 0 });
+  }
   const r = get(`${ITEM_SELECT} WHERE i.id = ?`, id);
   return r ? ok(mapItem(r)) : fail("not found", 404);
 }
 
 export async function DELETE(_r: Request, ctx: RouteContext<"/api/items/[id]">) {
   const { id } = await ctx.params;
-  const r = get("SELECT image, original FROM items WHERE id = ?", id);
+  const r = get("SELECT image, original, name, category, status, ai_tagged FROM items WHERE id = ?", id);
   if (!r) return fail("not found", 404);
+  note("item.removed", { piece: itemBit(r), wasDraft: r.status === "draft", aiTagged: !!r.ai_tagged });
   run("DELETE FROM items WHERE id = ?", id);
   for (const f of [r.image, r.original]) {
     if (!f) continue;

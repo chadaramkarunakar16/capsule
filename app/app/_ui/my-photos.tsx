@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { imageUrl } from "@/lib/engine";
 import { imgPath } from "@/lib/api";
 import { Img } from "./ui";
-import { analyseBodyPhoto, analyseFacePhoto } from "@/lib/vision";
+import { analyseBodyPhoto, analyseFacePhoto } from "@/lib/analyse";
 import { applyBodyPhoto, applyFacePhoto } from "@/lib/style/apply";
 import type { Profile } from "@/lib/style/profile";
 import { api } from "@/lib/api";
@@ -38,7 +38,7 @@ export function useFigureWidth(extra = 0) {
 type Kind = "face" | "body";
 
 /**
- * "Add my photos": a face photo and a full-body photo, analysed on this device (never uploaded or saved).
+ * "Add my photos": a face photo and a full-body photo, read by your AI service for one question (not stored).
  * Results go straight into the profile draft, so the style questions, the avatar and the face screens stay in step.
  */
 export function MyPhotos({ p, setP, kinds = ["face", "body"] }: { p: Profile; setP: (next: Profile) => void; kinds?: Kind[] }) {
@@ -152,7 +152,7 @@ export function MyPhotos({ p, setP, kinds = ["face", "body"] }: { p: Profile; se
           {notes[k]!.lines.map((l, i) => <div key={i} style={{ color: !notes[k]!.ok ? "var(--danger)" : undefined }}>{l}</div>)}
         </div>
       ))}
-      <p className="xs muted" style={{ marginTop: 8, lineHeight: 1.5 }}>Photos are analysed on this computer and never uploaded. They are only kept if you press “Use as my avatar” — then they stay in your Capsule data folder and “Delete everything” removes them. The first run loads a small model.</p>
+      <p className="xs muted" style={{ marginTop: 8, lineHeight: 1.5 }}>Photos are read by your AI service (Gemini or OpenAI) for this one question and are not stored. They are only kept if you press “Use as my avatar” — then they stay in your Capsule data folder and “Delete everything” removes them. </p>
     </div>
   );
 }

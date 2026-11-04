@@ -1,3 +1,5 @@
+import { all } from "@/lib/db";
+import { itemBit, note } from "@/lib/brain/events";
 import { fail, ok, run, tx, uid } from "@/lib/db";
 import { loadOutfits } from "@/lib/queries";
 
@@ -18,5 +20,6 @@ export async function POST(req: Request) {
       run("INSERT OR IGNORE INTO outfit_items (outfit_id,item_id,pos) VALUES (?,?,?)", id, iid, i),
     );
   });
+  note("outfit.saved", { name: b.name || "Untitled look", occasion: b.occasion ?? "", pieces: all(`SELECT name, category, color_name, fit FROM items WHERE id IN (${b.itemIds.map(() => "?").join(",")})`, ...b.itemIds).map((r) => itemBit(r)) });
   return ok(loadOutfits("WHERE id = ?", id)[0], 201);
 }

@@ -120,6 +120,19 @@ CREATE TABLE IF NOT EXISTS capsules (
   packed TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS brain_events (
+  id TEXT PRIMARY KEY,
+  at TEXT NOT NULL DEFAULT (datetime('now')),
+  kind TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_brain_at ON brain_events(at);
+CREATE TABLE IF NOT EXISTS brain_memory (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  data TEXT NOT NULL,
+  events_seen INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE INDEX IF NOT EXISTS idx_wears_date ON wears(date);
 CREATE INDEX IF NOT EXISTS idx_entries_board ON board_entries(board_id);
 `;

@@ -26,5 +26,5 @@ export function proxy(req: NextRequest) {
 
 export const config = {
   // everything except static assets that carry no personal data
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons/|mediapipe/|manifest.webmanifest|sw.js).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons/|manifest.webmanifest|sw.js).*)"],
 };

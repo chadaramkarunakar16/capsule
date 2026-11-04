@@ -1,3 +1,4 @@
+import { itemBit, note } from "@/lib/brain/events";
 import { all, fail, get, ok, run, tx, uid } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -37,5 +38,6 @@ export async function POST(req: Request) {
     run("INSERT INTO wears (id,date,outfit_id,note,planned) VALUES (?,?,?,?,?)", id, b.date, b.outfitId ?? null, b.note ?? "", b.planned ? 1 : 0);
     for (const iid of itemIds) run("INSERT OR IGNORE INTO wear_items (wear_id,item_id) VALUES (?,?)", id, iid);
   });
+  note(b.planned ? "wear.planned" : "wear", { pieces: all(`SELECT name, category, color_name, fit FROM items WHERE id IN (${itemIds.map(() => "?").join(",")})`, ...itemIds).map((r) => itemBit(r)), date: b.date });
   return ok(load("WHERE id = ?", id)[0], 201);
 }

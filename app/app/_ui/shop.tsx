@@ -4,7 +4,7 @@ import { api, img } from "@/lib/api";
 import { downscaleJpeg } from "@/lib/image";
 import { rankProducts, matchOwned } from "@/lib/shop/rank";
 import { COUNTRIES, searchLinks } from "@/lib/shop/stores";
-import type { Candidate, Piece, Product, Ranked } from "@/lib/shop/types";
+import type { Candidate, Look, Piece, Product, Ranked } from "@/lib/shop/types";
 import { nameColor } from "@/lib/style/colornames";
 import { CATEGORIES } from "@/lib/types";
 import { Overlay, Sheet, uid, Img, SecretKey } from "./ui";
@@ -417,10 +417,51 @@ function PieceForm({ piece, direction, onClose, onSave, onDelete }: { piece: Pie
 
 /* ------------------------------------------------------------------ Shop section of the closet: looks + wishlist */
 
+export type Wanted = { look: Look; piece: Piece; own: ReturnType<typeof matchOwned>; saved: number };
+
+/** Every piece from your inspiration looks that you still want. Pieces you already own something similar to are marked, not hidden. */
+export function useWanted() {
+  const { looks, gitems, wishlist } = useStore();
+  return useMemo<Wanted[]>(
+    () => looks.flatMap((look) => look.pieces.filter((p) => (p.want ?? "tobuy") === "tobuy").map((piece) => ({ look, piece, own: piece.forceShop ? null : matchOwned(piece, gitems), saved: wishlist.filter((w) => w.pieceId === piece.id).length }))),
+    [looks, gitems, wishlist],
+  );
+}
+
+/** Small card for the Capsule tab: what is on your to-buy list. */
+export function ToBuyCard() {
+  const { push } = useStore();
+  const wanted = useWanted().filter((w) => !w.own);
+  if (!wanted.length) return null;
+  return (
+    <div className="sec" style={{ paddingTop: 12 }}>
+      <h3>To buy · {wanted.length}</h3>
+      <div className="card" style={{ padding: 4 }}>
+        {wanted.slice(0, 4).map(({ look, piece }) => (
+          <button key={piece.id} className="line" onClick={() => push({ t: "look", id: look.id })}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 14, height: 14, borderRadius: "50%", background: piece.colorHex, boxShadow: "inset 0 0 0 1px rgba(0,0,0,.15)", flex: "none" }} />
+              <span><b style={{ fontSize: 14 }}>{piece.name}</b><span className="xs muted" style={{ display: "block" }}>From an inspiration look</span></span>
+            </span>
+            <span aria-hidden>›</span>
+          </button>
+        ))}
+      </div>
+      {wanted.length > 4 && <p className="xs muted" style={{ marginTop: 6 }}>+ {wanted.length - 4} more under Closet → Inspo &amp; buy.</p>}
+    </div>
+  );
+}
+
 export function ShopSection() {
   const { looks, wishlist, push, refresh, toast } = useStore();
   const [sheet, setSheet] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const wanted = useWanted();
+  async function setWant(look: Look, pieceId: string, want: NonNullable<Piece["want"]>) {
+    await api.patchLook(look.id, { pieces: look.pieces.map((p) => (p.id === pieceId ? { ...p, want } : p)) });
+    await refresh();
+    toast(want === "got" ? "Marked as got — add it to your closet from a photo when it arrives" : "Removed from your to-buy list");
+  }
   async function refreshOne(p: Product) {
     setBusy(p.id);
     try { await api.refreshProduct(p.id); await refresh(); toast("Price updated"); } catch (e) { toast(e instanceof Error ? e.message : "Couldn't refresh"); }
@@ -428,7 +469,7 @@ export function ShopSection() {
   }
   return (
     <div style={{ paddingTop: 12 }}>
-      <div className="sec" style={{ paddingTop: 0 }}><h3>Looks to shop</h3></div>
+      <div className="sec" style={{ paddingTop: 0 }}><h3>Inspiration looks {looks.length ? `· ${looks.length}` : ""}</h3></div>
       <div className="grid3" style={{ paddingTop: 0 }}>
         <button className="tile" onClick={() => setSheet(true)}>
           <div className="img" style={{ border: "1.5px dashed #cfc8bc", boxShadow: "none", background: "transparent", color: "var(--muted)", fontSize: 13, textAlign: "center" }}><span>＋<br />New look</span></div>
@@ -437,11 +478,37 @@ export function ShopSection() {
         {looks.map((l) => (
           <button className="tile" key={l.id} onClick={() => push({ t: "look", id: l.id })}>
             <div className="img" style={{ overflow: "hidden" }}><Img name={l.image} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "none" }} /></div>
-            <div className="b">{l.pieces.length ? `${l.pieces.length} pieces` : "Not analysed"}</div>
+            <div className="b">{l.pieces.length ? `${l.pieces.filter((p) => (p.want ?? "tobuy") === "tobuy").length} to buy · ${l.pieces.length} pieces` : "Not analysed yet"}</div>
             <div className="t">{new Date(l.createdAt.replace(" ", "T") + "Z").toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>
           </button>
         ))}
       </div>
+      <div className="sec" style={{ paddingTop: 4 }}><h3>To buy {wanted.length ? `· ${wanted.length}` : ""}</h3></div>
+      {wanted.length === 0 ? (
+        <div className="empty sm" style={{ paddingTop: 8 }}>Pieces from the looks you shop appear here, marked “to buy”, until you get them or skip them.</div>
+      ) : (
+        <div style={{ display: "grid", gap: 8, padding: "0 20px 16px" }}>
+          {wanted.map(({ look, piece, own, saved }) => (
+            <div key={piece.id} className="card" style={{ padding: 8, display: "flex", gap: 10 }}>
+              <button style={{ width: 64, height: 76, borderRadius: 10, background: "var(--tile)", overflow: "hidden", flex: "none", padding: 0, border: 0, position: "relative" }} onClick={() => push({ t: "look", id: look.id })} aria-label="Open the inspiration look">
+                <Img name={look.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <span style={{ position: "absolute", left: 5, bottom: 5, width: 14, height: 14, borderRadius: "50%", background: piece.colorHex, boxShadow: "0 0 0 1.5px #fff" }} />
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.3 }}>{piece.name}</div>
+                <div className="xs muted" style={{ marginTop: 2 }}>
+                  <span className="pill guess">{own ? "You own something similar" : saved ? `${saved} saved` : "To buy"}</span> · inspiration look{look.note ? ` · ${look.note}` : ""}
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                  <button className="chip" style={{ height: 28 }} onClick={() => push({ t: "look", id: look.id })}>{saved ? "See saved" : "Find it"}</button>
+                  <button className="chip" style={{ height: 28 }} onClick={() => setWant(look, piece.id, "got")}>Got it</button>
+                  <button className="chip" style={{ height: 28 }} onClick={() => setWant(look, piece.id, "skip")}>Not interested</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="sec" style={{ paddingTop: 4 }}><h3>Wishlist {wishlist.length ? `· ${wishlist.length}` : ""}</h3></div>
       {wishlist.length === 0 ? (
         <div className="empty sm" style={{ paddingTop: 8 }}>Tap ♡ on any product to keep it here.</div>

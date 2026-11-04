@@ -1,3 +1,4 @@
+import { itemBit, note } from "@/lib/brain/events";
 import { all, fail, get, ok, run } from "@/lib/db";
 import { mapProduct } from "@/lib/shop/db";
 
@@ -21,6 +22,7 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/products/[id]"
     run("UPDATE products SET selected = ? WHERE id = ?", b.selected ? 1 : 0, id);
   }
   if ("saved" in b) run("UPDATE products SET saved = ? WHERE id = ?", b.saved ? 1 : 0, id);
+  if (b.saved === true || b.selected === true) note(b.saved === true ? "product.saved" : "product.chosen", { title: String(r.title).slice(0, 80), merchant: r.merchant, price: r.price });
   run("UPDATE products SET updated_at = datetime('now') WHERE id = ?", id);
   // a product that is neither chosen nor saved has no reason to stay
   run("DELETE FROM products WHERE id = ? AND selected = 0 AND saved = 0", id);

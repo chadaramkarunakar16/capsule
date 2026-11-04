@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { api, img } from "@/lib/api";
 import { CATEGORIES, type Item } from "@/lib/types";
-import { colorDistance, downscaleJpeg, guessTags, nameColor, removeBg, trimPng } from "@/lib/image";
+import { colorDistance, downscaleJpeg, guessTags, nameColor } from "@/lib/image";
 import { Sheet, Img } from "./ui";
 import { useStore } from "./store";
 
@@ -14,7 +14,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export function AddSheet() {
   const { setSheet, refresh, push, toast } = useStore();
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [cut, setCut] = useState(true);
+  const [cut, setCut] = useState(false);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -35,33 +35,21 @@ export function AddSheet() {
       try {
         patch(id, { status: "Preparing photo…" });
         const original = await downscaleJpeg(f);
-        let cutout: Blob = original, w = 0, h = 0;
-        if (cut) {
-          patch(id, { status: "Removing background…" });
-          try {
-            let last = -1;
-            const png = await removeBg(original, (p, what) => {
-              const pct = Math.round(p * 100);
-              if (pct !== last) { last = pct; patch(id, { status: what.startsWith("fetch") ? `Loading cut-out model… ${pct}%` : "Removing background…" }); }
-            });
-            const t = await trimPng(png);
-            cutout = t.blob; w = t.w; h = t.h;
-          } catch (e) {
-            console.warn("background removal failed, using original", e);
-            patch(id, { status: "Cut-out unavailable — using the original photo…" });
-            await wait(600);
-          }
-        }
-        if (!w) {
-          const bm = await createImageBitmap(cutout);
-          w = bm.width; h = bm.height;
-        }
+        const bm = await createImageBitmap(original);
+        const w = bm.width, h = bm.height;
+        const cutout: Blob = original;
         patch(id, { status: "Saving…" });
         const up = await api.upload(cutout, original);
+        let shown = up.image;
+        if (cut) {
+          // optional AI clean cut-out: the same garment alone on a plain background (about 4¢)
+          patch(id, { status: "Making a clean cut-out…" });
+          try { const c = await api.cutout(up.image); if (c.available && c.image) shown = c.image; } catch (e) { console.warn("cut-out failed, keeping the photo", e); }
+        }
         patch(id, { status: "Tagging…" });
         let tags = null as Awaited<ReturnType<typeof api.tag>>["tags"] | null;
         try {
-          const r = await api.tag(up.image);
+          const r = await api.tag(shown);
           if (r.aiAvailable && r.tags) tags = r.tags;
         } catch (e) {
           console.warn("AI tagging failed, using local guess", e);
@@ -69,7 +57,7 @@ export function AddSheet() {
         const aiTagged = !!tags;
         if (!tags) tags = await guessTags(cutout, w, h);
         await api.createItem({
-          image: up.image,
+          image: shown,
           original: up.original,
           status: "draft",
           aiTagged,
@@ -115,14 +103,15 @@ export function AddSheet() {
         c.width = Math.max(8, Math.round(x1 - x0)); c.height = Math.max(8, Math.round(y1 - y0));
         c.getContext("2d")!.drawImage(bm, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
         const crop = await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("crop failed"))), "image/jpeg", 0.9));
-        let cutout: Blob = crop;
-        if (cut) { try { cutout = (await trimPng(await removeBg(crop))).blob; } catch (e) { console.warn("cut-out failed for a piece", e); } }
+        const cutout: Blob = crop;
         const saved = await api.upload(cutout);
+        let shown = saved.image;
+        if (cut) { try { const c = await api.cutout(saved.image); if (c.available && c.image) shown = c.image; } catch (e) { console.warn("cut-out failed for a piece", e); } }
         let tags: Awaited<ReturnType<typeof api.tag>>["tags"] | null = null;
-        try { const t = await api.tag(saved.image); if (t.aiAvailable && t.tags) tags = t.tags; } catch { /* keep the split's own labels */ }
+        try { const t = await api.tag(shown); if (t.aiAvailable && t.tags) tags = t.tags; } catch { /* keep the split's own labels */ }
         const hex = tags?.colorHex ?? (await guessTags(cutout, c.width, c.height)).colorHex ?? "#cccccc";
         const item = await api.createItem({
-          image: saved.image, status: "draft", aiTagged: true, ...tags,
+          image: shown, status: "draft", aiTagged: true, ...tags,
           name: tags?.name || p.name, category: p.category, colorHex: hex, colorName: tags?.colorName || nameColor(hex),
         });
         ids.push(item.id);
@@ -154,13 +143,13 @@ export function AddSheet() {
           <button className="btn dark" disabled={busy} onClick={() => input.current?.click()}>Choose photos</button>
           <button className="btn light" disabled={busy} onClick={() => outfitInput.current?.click()}>Outfit photo</button>
         </div>
-        <div className="xs" style={{ marginTop: 8 }}>“Outfit photo” splits a mirror selfie into its pieces (needs an AI key)</div>
+        <div className="xs" style={{ marginTop: 8 }}>“Outfit photo” splits a mirror selfie into its pieces (uses your AI key)</div>
         <input ref={outfitInput} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) processOutfit(f); }} />
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; processFiles(fs); }} />
       </div>
       <label className="job" style={{ cursor: "pointer", marginTop: 6 }}>
         <input type="checkbox" checked={cut} onChange={(e) => setCut(e.target.checked)} disabled={busy} />
-        <span>Remove backgrounds on this device <span className="muted xs">(slower, cleaner closet)</span></span>
+        <span>Clean AI cut-outs <span className="muted xs">(plain background; about 4¢ per piece, uses your AI key)</span></span>
       </label>
       {jobs.length > 0 && (
         <div style={{ marginTop: 8 }}>

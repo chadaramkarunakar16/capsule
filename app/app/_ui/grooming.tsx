@@ -181,7 +181,7 @@ export function GroomingHome() {
         <>
           <div className="sec" style={{ paddingTop: 12 }}>
             <button className="btn dark full" onClick={() => push({ t: "glassesphoto" })}>Try frames on my photo</button>
-            <p className="xs muted" style={{ marginTop: 6, lineHeight: 1.5 }}>Your photo is processed on this device and never uploaded.</p>
+            <p className="xs muted" style={{ marginTop: 6, lineHeight: 1.5 }}>Your photo is sent to your AI service only when you press the button, and is not stored.</p>
           </div>
           <div className="grid2" style={{ paddingTop: 4 }}>{frames.slice(0, 11).map((r) => card(r, "glasses"))}</div>
         </>

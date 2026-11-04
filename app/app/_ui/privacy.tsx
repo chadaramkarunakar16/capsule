@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { BROWSER_ENGINE, engineStatus } from "@/lib/engine";
-import { GeminiKeyField } from "./gemini-key";
+import { AiKeyField } from "./gemini-key";
 import { open as openBox, seal } from "@/lib/backup";
 import { Overlay, Sheet, SecretKey } from "./ui";
 import { useStore } from "./store";
@@ -10,12 +10,11 @@ import { useStore } from "./store";
 type Inv = Awaited<ReturnType<typeof api.inventory>>;
 const mb = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 
-const LEAVES: { who: string; what: string; when: string; on?: (i: Inv) => boolean; key?: "gemini" | "serpapi" | "fashn" }[] = [
-  { who: "Google Gemini", what: "Photos you add (shrunk first) so Gemini can fill in piece details, split outfit photos and read inspiration looks. For photo try-on: your photo and the garment images, each time you press the button.", when: "Only while an AI key is set.", on: (i) => i.keys.anthropic, key: "gemini" },
+const LEAVES: { who: string; what: string; when: string; on?: (i: Inv) => boolean; key?: "gemini" | "openai" | "serpapi" }[] = [
+  { who: "Google Gemini", what: "When Gemini is your AI service: the photos you add (shrunk first), your face and body photos when you press analyse, your try-on and avatar photos, and a short text summary of your profile, closet and habits (the AI brain). Never your whole library.", when: "Only while a Gemini key is saved and you use an AI feature.", on: (i) => i.keys.gemini, key: "gemini" },
+  { who: "OpenAI", what: "The same, if OpenAI is your AI service instead.", when: "Only while an OpenAI key is saved and you use an AI feature.", on: (i) => i.keys.openai, key: "openai" },
   { who: "SerpApi", what: "Search words only (for example “olive overshirt men”). Never photos.", when: "Only while a shopping key is set.", on: (i) => i.keys.serpapi, key: "serpapi" },
-  { who: "FASHN", what: "Your photo and the garment images — each time you press “On my photo”.", when: "Only with a try-on key and your tick each time.", on: (i) => i.keys.fashn, key: "fashn" },
   { who: "Open-Meteo", what: "The coordinates of the place you chose, to fetch a forecast.", when: "Only if you turn weather on." },
-  { who: "Model downloads", what: "One-time downloads of the background-removal and face/pose models. Nothing of yours is sent.", when: "First use of those features." },
   { who: "Stores you open", what: "Links open in a new tab, like any link. Capsule adds no tracking or affiliate tags.", when: "When you tap a link." },
 ];
 
@@ -64,9 +63,8 @@ export function PrivacyCentre() {
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><b style={{ fontSize: 14 }}>{l.who}</b>{on !== undefined && <span className={`pill ${on ? "guess" : "ai"}`}>{on ? "Key saved" : "No key"}</span>}</div>
                 <div className="sm" style={{ lineHeight: 1.45, marginTop: 2 }}>{l.what}</div>
                 <div className="xs muted" style={{ marginTop: 2 }}>{l.when}</div>
-                {l.key === "gemini" && <div style={{ marginTop: 10 }}><GeminiKeyField onChange={() => load()} /></div>}
+                {(l.key === "gemini" || l.key === "openai") && <div style={{ marginTop: 10 }}><AiKeyField which={l.key} onChange={() => load()} /></div>}
                 {l.key === "serpapi" && <div style={{ marginTop: 10 }}><SecretKey isSet={!!inv?.keys.serpapi} placeholder="Paste your SerpApi key" noun="shopping key" onSave={async (v) => { await api.saveSettings({ serpApiKey: v }); await load(); }} onRemove={async () => { await api.saveSettings({ serpApiKey: "" }); await load(); }} /></div>}
-                {l.key === "fashn" && <div style={{ marginTop: 10 }}><SecretKey isSet={!!inv?.keys.fashn} placeholder="Optional: FASHN API key" noun="FASHN key" onSave={async (v) => { await api.saveSettings({ fashnKey: v }); await load(); }} onRemove={async () => { await api.saveSettings({ fashnKey: "" }); await load(); }} /></div>}
               </div>
             );
           })}
@@ -204,13 +202,13 @@ function BackupSheet({ mode, onClose, onDone }: { mode: "make" | "restore"; onCl
 
 function WipeSheet({ onClose }: { onClose: () => void }) {
   const [typed, setTyped] = useState("");
-  const [keys, setKeys] = useState(true), [models, setModels] = useState(false);
+  const [keys, setKeys] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   async function wipe() {
     setBusy(true); setErr(null);
     try {
-      await api.wipe({ confirm: typed, keys, models });
+      await api.wipe({ confirm: typed, keys });
       try { localStorage.clear(); } catch { /* ignore */ }
       if ("caches" in window) for (const k of await caches.keys()) await caches.delete(k);
       window.location.href = "/";
@@ -221,7 +219,6 @@ function WipeSheet({ onClose }: { onClose: () => void }) {
       <h2 className="h-l" style={{ marginBottom: 6 }}>Delete everything?</h2>
       <p className="sm" style={{ lineHeight: 1.5, marginBottom: 10 }}>This permanently removes your pieces, outfits, boards, looks, plans, profile and every stored photo. It can’t be undone.</p>
       <label className="job" style={{ cursor: "pointer" }}><input type="checkbox" checked={keys} onChange={(e) => setKeys(e.target.checked)} /><span>Also remove my API keys (Anthropic, SerpApi, FASHN)</span></label>
-      <label className="job" style={{ cursor: "pointer" }}><input type="checkbox" checked={models} onChange={(e) => setModels(e.target.checked)} /><span>Also remove downloaded face/pose models</span></label>
       <input className="input" style={{ margin: "10px 0" }} placeholder="Type DELETE EVERYTHING" aria-label="Type DELETE EVERYTHING to confirm" value={typed} onChange={(e) => setTyped(e.target.value)} />
       {err && <div role="alert" className="sm" style={{ color: "var(--danger)", marginBottom: 8 }}>{err}</div>}
       <button className="btn danger full" disabled={busy || typed !== "DELETE EVERYTHING"} onClick={wipe}>{busy ? "Deleting…" : "Delete everything"}</button>

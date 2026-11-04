@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { UPLOAD_DIR, all, fail, get, ok } from "@/lib/db";
 import { aiReady, askJSON } from "@/lib/ai";
+import { note } from "@/lib/brain/events";
 import { ADVISOR_RULES, brief } from "@/lib/knowledge";
 import { BEARDS, FRAMES, HAIRSTYLES } from "@/lib/grooming/catalog";
 import { suggestBeards, suggestFrames, suggestHair } from "@/lib/grooming/suggest";
@@ -30,6 +31,7 @@ export async function POST(req: Request) {
   let p = normalizeProfile(null);
   try { if (row) p = normalizeProfile(JSON.parse(row.data)); } catch { /* defaults */ }
   const know = brief(p, topic);
+  note("advice.asked", { topic, occasion: topic === "outfits" ? str(b?.occasion, 60) : undefined });
 
   try {
     if (topic === "grooming") {

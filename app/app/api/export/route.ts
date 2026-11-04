@@ -23,6 +23,8 @@ export async function GET() {
     capsules: all("SELECT * FROM capsules"),
     products: all("SELECT * FROM products"),
     price_history: all("SELECT * FROM price_history"),
+    brain_events: all("SELECT * FROM brain_events"),
+    brain_memory: all("SELECT * FROM brain_memory"),
   };
   const names = new Set<string>();
   for (const i of tables.items) {
@@ -31,6 +33,10 @@ export async function GET() {
   }
   for (const e of tables.board_entries) if (e.image) names.add(e.image);
   for (const l of tables.looks) if (l.image) names.add(l.image);
+  // pictures kept on the profile (your photo, face photo, AI image)
+  for (const p of tables.profile) {
+    try { const a = JSON.parse(p.data).avatar ?? {}; for (const k of ["photo", "facePhoto", "aiImage"]) if (typeof a[k] === "string") names.add(a[k]); } catch { /* skip */ }
+  }
   const images: Record<string, string> = {};
   for (const n of names) {
     const f = path.join(UPLOAD_DIR, path.basename(n));

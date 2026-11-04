@@ -2,7 +2,7 @@
 // don't allow cross-origin requests. It stores nothing and logs nothing; API keys pass through in headers.
 // Runs unchanged as a Next route (local) and as a Cloudflare Pages Function (hosted).
 
-const KEYED = new Set(["generativelanguage.googleapis.com", "api.anthropic.com", "serpapi.com", "api.fashn.ai"]);
+const KEYED = new Set(["generativelanguage.googleapis.com", "api.openai.com", "serpapi.com"]);
 const PASS_REQ = /^(content-type|accept|authorization|x-api-key|x-goog-api-key|anthropic-version|anthropic-beta|user-agent)$/i;
 const PASS_RES = /^(content-type|content-length|location|cache-control)$/i;
 const MAX_BYTES = 15 * 1024 * 1024;

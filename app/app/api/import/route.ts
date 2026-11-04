@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const TABLES = ["items", "outfits", "outfit_items", "wears", "wear_items", "boards", "board_entries"] as const;
-const OPTIONAL = ["profile", "feedback", "looks", "products", "price_history", "capsules"] as const; // absent in exports made before Phase 2
+const OPTIONAL = ["profile", "feedback", "looks", "products", "price_history", "capsules", "brain_events", "brain_memory"] as const; // absent in exports made before Phase 2
 const NAME = /^[\w.-]+$/;
 
 // Replaces the whole library with the contents of an export file.
@@ -31,6 +31,8 @@ export async function POST(req: Request) {
     run("DELETE FROM products");
     run("DELETE FROM looks");
     run("DELETE FROM capsules");
+    run("DELETE FROM brain_events");
+    run("DELETE FROM brain_memory");
     for (const t of [...TABLES, ...OPTIONAL]) {
       if (!Array.isArray(b[t])) continue;
       const valid = new Set(all(`PRAGMA table_info(${t})`).map((c) => c.name as string));

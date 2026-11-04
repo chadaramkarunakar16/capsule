@@ -10,8 +10,6 @@ const SERVER_ONLY = new Set(["app/api", "app/proxy", "app/share", "app/unlock", 
 const SKIP = new Set(["node_modules", ".next", "out", "data", WORK, ".git", "functions", "android", "docs", "engine", "relay", "scripts", "tests"]);
 const env = { ...process.env, CAPSULE_STATIC: "1", NEXT_PUBLIC_ENGINE: "browser" };
 
-execSync("node scripts/copy-wasm.mjs", { stdio: "inherit", env });
-execSync("node scripts/fetch-imgly.mjs", { stdio: "inherit", env });
 execSync("node scripts/build-engine.mjs", { stdio: "inherit", env });
 
 fs.rmSync(WORK, { recursive: true, force: true });

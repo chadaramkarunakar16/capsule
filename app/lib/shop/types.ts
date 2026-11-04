@@ -13,6 +13,8 @@ export type Piece = {
   formality?: number;
   /** user chose to look for one even though they own something close */
   forceShop?: boolean;
+  /** what you want to do with this piece from an inspiration look: still to buy (the default), got it, or not interested */
+  want?: "tobuy" | "got" | "skip";
 };
 
 export type Look = {

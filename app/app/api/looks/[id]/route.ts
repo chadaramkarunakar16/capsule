@@ -1,3 +1,4 @@
+import { itemBit, note } from "@/lib/brain/events";
 import { fail, ok, run } from "@/lib/db";
 import { getLook, listProducts } from "@/lib/shop/db";
 
@@ -13,7 +14,14 @@ export async function GET(_r: Request, ctx: RouteContext<"/api/looks/[id]">) {
 export async function PATCH(req: Request, ctx: RouteContext<"/api/looks/[id]">) {
   const { id } = await ctx.params;
   const b = await req.json().catch(() => ({}));
-  if (Array.isArray(b.pieces)) run("UPDATE looks SET pieces = ?, analysed = 1 WHERE id = ?", JSON.stringify(b.pieces), id);
+  if (Array.isArray(b.pieces)) {
+    const before = getLook(id)?.pieces ?? [];
+    run("UPDATE looks SET pieces = ?, analysed = 1 WHERE id = ?", JSON.stringify(b.pieces), id);
+    for (const p of b.pieces as { id: string; name: string; want?: string }[]) {
+      const was = before.find((x) => x.id === p.id)?.want ?? "tobuy";
+      if ((p.want ?? "tobuy") !== was) note("piece.want", { name: p.name, want: p.want });
+    }
+  }
   if ("note" in b) run("UPDATE looks SET note = ? WHERE id = ?", String(b.note), id);
   if ("sourceUrl" in b) run("UPDATE looks SET source_url = ? WHERE id = ?", String(b.sourceUrl), id);
   const look = getLook(id);

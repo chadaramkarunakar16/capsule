@@ -1,10 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { UPLOAD_DIR, fail, get, ok, uid } from "@/lib/db";
-import { AVATAR_MODEL, geminiImage, type Img } from "@/lib/ai";
+import { aiReady, makeImage, type Img } from "@/lib/ai";
 import { avatarPrompt } from "@/lib/avatar/prompt";
 import { normalizeProfile } from "@/lib/style/profile";
-import { geminiKey } from "@/lib/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,9 +19,9 @@ function load(name: unknown): Img | null {
   return { data: new Uint8Array(fs.readFileSync(file)), mime: MIME[path.extname(name).toLowerCase()] ?? "image/jpeg" };
 }
 
-/** body: { photo?: imageName, facePhoto?: imageName } - makes an AI image of the person from their saved photos. */
+/** body: { photo?: imageName, facePhoto?: imageName } - makes an AI image of the person from their saved photos (identity-grade model). */
 export async function POST(req: Request) {
-  if (!geminiKey()) return ok({ available: false });
+  if (!aiReady()) return ok({ available: false });
   const b = await req.json().catch(() => null);
   const body = load(b?.photo), face = load(b?.facePhoto);
   if (!body && !face) return fail("Add a photo first");
@@ -31,12 +30,12 @@ export async function POST(req: Request) {
   try { if (row) profile = normalizeProfile(JSON.parse(row.data)); } catch { /* use defaults */ }
   try {
     const refs = [body, face].filter((x): x is Img => !!x);
-    const out = await geminiImage(AVATAR_MODEL, avatarPrompt(profile, { body: !!body, face: !!face }), refs, { aspect: "2:3" });
+    const out = await makeImage("likeness", avatarPrompt(profile, { body: !!body, face: !!face }), refs, { aspect: "portrait" });
     const ext = out.mime.includes("png") ? "png" : out.mime.includes("webp") ? "webp" : "jpg";
     const name = `${uid()}-avatar.${ext}`;
     fs.writeFileSync(path.join(UPLOAD_DIR, name), Buffer.from(out.data));
     return ok({ available: true, image: name });
   } catch (e) {
-    return fail(e instanceof Error ? e.message : "Couldn\u2019t create the image", 502);
+    return fail(e instanceof Error ? e.message : "Couldn’t create the image", 502);
   }
 }
