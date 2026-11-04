@@ -1,0 +1,96 @@
+{
+  "name": "app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1",
+    "build:static": "node scripts/build-static.mjs",
+    "preview:static": "wrangler pages dev out --compatibility-date=2025-01-01",
+    "deploy": "npm run build:static && wrangler pages deploy out --project-name=capsule",
+    "dev:browser": "node scripts/build-engine.mjs && cross-env NEXT_PUBLIC_ENGINE=browser next dev -H 127.0.0.1",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1",
+    "predev": "node scripts/copy-wasm.mjs",
+    "prebuild": "node scripts/copy-wasm.mjs",
+    "test": "tsx --test tests/*.test.ts",
+    "lan": "node scripts/lan.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "desktop": "electron .",
+    "desktop:build": "node scripts/build-desktop.mjs",
+    "desktop:pack": "npm run desktop:build && electron-builder --win --dir",
+    "desktop:dist": "npm run desktop:build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0",
+    "@imgly/background-removal": "^1.7.0",
+    "@mediapipe/tasks-vision": "^1.2.0",
+    "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
+    "next": "16.4.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "buffer": "^6.0.3",
+    "cross-env": "^10.1.0",
+    "electron": "^45.2.2",
+    "electron-builder": "^26.18.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "wrangler": "^4.157.0"
+  },
+  "main": "desktop/main.cjs",
+  "description": "Capsule - a capsule-wardrobe and personal style app that keeps your data on your PC.",
+  "author": "Capsule",
+  "build": {
+    "appId": "app.capsule.wardrobe",
+    "productName": "Capsule",
+    "copyright": "Capsule",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "desktop/**",
+      "build/icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "server",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Capsule",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false
+    },
+    "asar": true,
+    "afterPack": "scripts/after-pack.cjs"
+  }
+}
