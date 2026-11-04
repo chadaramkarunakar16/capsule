@@ -14,6 +14,7 @@ import { AvatarEditor, Lineup, TryOnScreen } from "./_ui/avatar";
 import { PhotoTryOn } from "./_ui/avatar-photo";
 import { GroomingHome, StyleDetail } from "./_ui/grooming";
 import { PrivacyCentre } from "./_ui/privacy";
+import { StylistAdvice } from "./_ui/advice";
 import { GlassesPhoto } from "./_ui/grooming-photo";
 import { StoreProvider, useStore, type Overlay as OverlayT } from "./_ui/store";
 import { CapsuleTab, ClosetTab, MeTab, TodayTab } from "./_ui/tabs";
@@ -24,6 +25,7 @@ type Tab = "today" | "closet" | "capsule" | "me";
 function renderOverlay(o: OverlayT, pop: () => void, key: number) {
   switch (o.t) {
     case "item": return <ItemDetail key={key} id={o.id} />;
+    case "advice": return <StylistAdvice key={key} topic={o.topic} />;
     case "review": return <Overlay key={key} title="Review new items" onBack={pop}><ReviewQueue /></Overlay>;
     case "outfit": return <OutfitBuilder key={key} outfitId={o.outfitId} itemIds={o.itemIds} />;
     case "board": return <BoardView key={key} id={o.id} />;

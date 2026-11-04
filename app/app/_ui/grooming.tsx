@@ -109,6 +109,17 @@ export function GroomingHome() {
 
   return (
     <Overlay title="Hair, beard & glasses" onBack={pop}>
+      <div className="card" style={{ margin: "4px 20px 12px", padding: 12, display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ width: 54, height: 66, borderRadius: 12, background: "var(--tile)", overflow: "hidden", flex: "none", display: "grid", placeItems: "center", color: "var(--muted)", fontSize: 22 }}>{profile.avatar.facePhoto ? <Img name={profile.avatar.facePhoto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "☺"}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <b style={{ fontSize: 14.5 }}>{profile.face.shape ? `${profile.face.shape[0].toUpperCase()}${profile.face.shape.slice(1)} face` : "No face shape yet"}</b>
+          <div className="xs muted" style={{ lineHeight: 1.4 }}>{profile.avatar.facePhoto ? "From your face photo" : profile.face.shape ? "Chosen by you" : "Add a face photo or pick one"}</div>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button className="btn light sm" onClick={() => push({ t: "avatar" })}>{profile.avatar.facePhoto ? "Update photo" : "Add photo"}</button>
+          <button className="btn dark sm" onClick={() => push({ t: "advice", topic: "grooming" })}>Ask the stylist</button>
+        </div>
+      </div>
       <div className="seg" style={{ marginTop: 4 }}>
         {(["hair", "beard", "glasses"] as const).map((t) => <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{t === "hair" ? "Hair" : t === "beard" ? "Facial hair" : "Glasses"}</button>)}
       </div>

@@ -7,7 +7,7 @@ import { COUNTRIES, searchLinks } from "@/lib/shop/stores";
 import type { Candidate, Piece, Product, Ranked } from "@/lib/shop/types";
 import { nameColor } from "@/lib/style/colornames";
 import { CATEGORIES } from "@/lib/types";
-import { Overlay, Sheet, uid, Img } from "./ui";
+import { Overlay, Sheet, uid, Img, SecretKey } from "./ui";
 import { useStore } from "./store";
 
 type Settings = Awaited<ReturnType<typeof api.settings>>;
@@ -478,11 +478,9 @@ export function ShopSection() {
 export function ShoppingSettings() {
   const { toast } = useStore();
   const [st, setSt] = useState<Settings | null>(null);
-  const [key, setKey] = useState("");
   useEffect(() => { api.settings().then(setSt).catch(() => {}); }, []);
   if (!st) return null;
   async function saveCountry(c: string) { await api.saveSettings({ country: c }); setSt(await api.settings()); toast("Region saved"); }
-  async function saveKey() { await api.saveSettings({ serpApiKey: key }); setKey(""); setSt(await api.settings()); toast(key.trim() ? "Shopping key saved on this computer" : "Shopping key removed"); }
   return (
     <div className="sec">
       <h3>Shopping</h3>
@@ -491,16 +489,19 @@ export function ShoppingSettings() {
         <select className="input" value={st.country} onChange={(e) => saveCountry(e.target.value)}>{COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}</select>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "14px 0 6px" }}>
           <b style={{ fontSize: 15 }}>Live price search</b>
-          <span className={`pill ${st.shopAvailable ? "ai" : "guess"}`}>{st.shopAvailable ? `Key ${st.shopKeyHint}` : "Not connected"}</span>
+          <span className={`pill ${st.shopAvailable ? "ai" : "guess"}`}>{st.shopAvailable ? "Key saved" : "Not connected"}</span>
         </div>
         <p className="xs muted" style={{ lineHeight: 1.5, marginBottom: 10 }}>
           Optional. With a <a href="https://serpapi.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>SerpApi</a> key Capsule can pull Google Shopping results (price, rating, reviews, store) for each piece. Without one you still get store-search links and “paste a product link”. The key stays on this computer; searches are billed by SerpApi per their plan.
         </p>
         {st.shopKeyFromEnv ? <div className="xs muted">Key is set via the SERPAPI_KEY environment variable.</div> : (
-          <div style={{ display: "flex", gap: 8 }}>
-            <input className="input" type="password" placeholder="SerpApi key" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />
-            <button className="btn dark" disabled={!key.trim() && !st.shopAvailable} onClick={saveKey}>{key.trim() || !st.shopAvailable ? "Save" : "Remove"}</button>
-          </div>
+          <SecretKey
+            isSet={st.shopAvailable}
+            placeholder="Paste your SerpApi key"
+            noun="shopping key"
+            onSave={async (v) => { await api.saveSettings({ serpApiKey: v }); setSt(await api.settings()); toast("Shopping key saved on this computer"); }}
+            onRemove={async () => { await api.saveSettings({ serpApiKey: "" }); setSt(await api.settings()); toast("Shopping key removed"); }}
+          />
         )}
       </div>
     </div>

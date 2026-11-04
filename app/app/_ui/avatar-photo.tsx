@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api, imgPath } from "@/lib/api";
 import { imageUrl } from "@/lib/engine";
 import { toJpegDataUri } from "@/lib/image";
-import { Overlay, Sheet, Img } from "./ui";
+import { Overlay, Sheet, Img, SecretKey } from "./ui";
 import { useStore } from "./store";
 
 const CONSENT_KEY = "capsule.tryonConsent";
@@ -133,10 +133,8 @@ export function PhotoTryOn({ itemIds }: { itemIds: string[] }) {
 export function TryOnSettings() {
   const { toast } = useStore();
   const [st, setSt] = useState<Awaited<ReturnType<typeof api.settings>> | null>(null);
-  const [key, setKey] = useState("");
   useEffect(() => { api.settings().then(setSt).catch(() => {}); }, []);
   if (!st) return null;
-  async function save() { await api.saveSettings({ fashnKey: key }); setKey(""); setSt(await api.settings()); toast(key.trim() ? "Try-on key saved on this computer" : "Try-on key removed"); }
   async function pick(p: "gemini" | "fashn") { await api.saveSettings({ tryonProvider: p }); setSt(await api.settings()); }
   const label = st.tryonProvider === "gemini" ? "Gemini" : st.tryonProvider === "fashn" ? "FASHN" : "";
   return (
@@ -159,10 +157,13 @@ export function TryOnSettings() {
           </div>
         )}
         {st.tryonKeyFromEnv ? <div className="xs muted">FASHN key is set via the FASHN_API_KEY environment variable.</div> : (
-          <div style={{ display: "flex", gap: 8 }}>
-            <input className="input" type="password" placeholder={st.tryonHasFashn ? `FASHN key ${st.tryonKeyHint ?? ""}` : "Optional: FASHN API key"} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />
-            <button className="btn dark" disabled={!key.trim() && !st.tryonHasFashn} onClick={save}>{key.trim() || !st.tryonHasFashn ? "Save" : "Remove"}</button>
-          </div>
+          <SecretKey
+            isSet={st.tryonHasFashn}
+            placeholder="Optional: FASHN API key"
+            noun="FASHN key"
+            onSave={async (v) => { await api.saveSettings({ fashnKey: v }); setSt(await api.settings()); toast("Try-on key saved on this computer"); }}
+            onRemove={async () => { await api.saveSettings({ fashnKey: "" }); setSt(await api.settings()); toast("Try-on key removed"); }}
+          />
         )}
       </div>
     </div>

@@ -1,5 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { imageUrl } from "@/lib/engine";
+import { imgPath } from "@/lib/api";
+import { Img } from "./ui";
 import { analyseBodyPhoto, analyseFacePhoto } from "@/lib/vision";
 import { applyBodyPhoto, applyFacePhoto } from "@/lib/style/apply";
 import type { Profile } from "@/lib/style/profile";
@@ -38,7 +41,7 @@ type Kind = "face" | "body";
  * "Add my photos": a face photo and a full-body photo, analysed on this device (never uploaded or saved).
  * Results go straight into the profile draft, so the style questions, the avatar and the face screens stay in step.
  */
-export function MyPhotos({ p, setP }: { p: Profile; setP: (next: Profile) => void }) {
+export function MyPhotos({ p, setP, kinds = ["face", "body"] }: { p: Profile; setP: (next: Profile) => void; kinds?: Kind[] }) {
   const [busy, setBusy] = useState<Kind | null>(null);
   const [notes, setNotes] = useState<Partial<Record<Kind, { ok: boolean; lines: string[] }>>>({});
   const [thumb, setThumb] = useState<Partial<Record<Kind, string>>>({});
@@ -48,6 +51,26 @@ export function MyPhotos({ p, setP }: { p: Profile; setP: (next: Profile) => voi
   const body = useRef<HTMLInputElement>(null);
   const latest = useRef(p);
   latest.current = p; // analysis is async: always apply onto the newest draft
+
+  // a face photo kept earlier but never analysed (for example added before this version) is read once, so the face
+  // shape, skin and hair colour on every screen come from it without asking again
+  const autoRan = useRef(false);
+  useEffect(() => {
+    const name = p.avatar.facePhoto;
+    if (autoRan.current || !name || p.face.auto || !kinds.includes("face")) return;
+    autoRan.current = true;
+    (async () => {
+      try {
+        const blob = await (await fetch(await imageUrl(imgPath(name)))).blob();
+        const r = await analyseFacePhoto(blob);
+        if (!r.ok) { setNotes((n) => ({ ...n, face: { ok: false, lines: [r.reason] } })); return; }
+        const a = applyFacePhoto(latest.current, r);
+        setP(a.profile);
+        setNotes((n) => ({ ...n, face: { ok: true, lines: ["Read from your saved face photo.", ...a.notes] } }));
+      } catch { /* the user can add a photo manually */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.avatar.facePhoto]);
 
   async function run(kind: Kind, f: File) {
     setBusy(kind);
@@ -99,10 +122,11 @@ export function MyPhotos({ p, setP }: { p: Profile; setP: (next: Profile) => voi
     setP({ ...cur, avatar: a });
   }
 
+  const savedName = (kind: Kind) => (kind === "body" ? p.avatar.photo : p.avatar.facePhoto);
   const saved = (kind: Kind) => !!(kind === "body" ? p.avatar.photo : p.avatar.facePhoto);
   const card = (kind: Kind, title: string, hint: string, has: boolean, ref: React.RefObject<HTMLInputElement | null>) => (
     <div className="card photo-card">
-      <div className="photo-thumb">{thumb[kind] ? <img src={thumb[kind]} alt="" /> : <span aria-hidden>{kind === "face" ? "☺" : "▯"}</span>}</div>
+      <div className="photo-thumb">{thumb[kind] ? <img src={thumb[kind]} alt="" /> : savedName(kind) ? <Img name={savedName(kind)} alt="" /> : <span aria-hidden>{kind === "face" ? "☺" : "▯"}</span>}</div>
       <div className="photo-body">
         <b>{title}</b>
         <span className="xs muted">{hint}</span>
@@ -120,8 +144,8 @@ export function MyPhotos({ p, setP }: { p: Profile; setP: (next: Profile) => voi
   return (
     <div className="my-photos">
       <div className="photo-grid">
-        {card("face", "Face photo", "Front-facing, hair back, good light. Sets face shape, skin tone and hair colour.", !!p.face.auto, face)}
-        {card("body", "Full-body photo", "Standing straight, feet in frame. Sets shoulders-vs-hips and torso-vs-legs.", p.body.source === "photo", body)}
+        {kinds.includes("face") && card("face", "Face photo", "Front-facing, hair back, good light. Sets face shape, skin tone and hair colour.", !!p.face.auto, face)}
+        {kinds.includes("body") && card("body", "Full-body photo", "Standing straight, feet in frame. Sets shoulders-vs-hips and torso-vs-legs.", p.body.source === "photo", body)}
       </div>
       {(["face", "body"] as Kind[]).map((k) => notes[k] && (
         <div key={k} className="card" style={{ padding: 12, marginTop: 8, fontSize: 13, lineHeight: 1.5, borderColor: notes[k]!.ok ? undefined : "#efc9c4" }}>

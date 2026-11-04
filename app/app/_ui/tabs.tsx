@@ -2,7 +2,7 @@
 import { useMemo, useRef, useState } from "react";
 import { api, img } from "@/lib/api";
 import { CATEGORIES } from "@/lib/types";
-import { Collage, I, Ico, Tile, fmtDate, iso, money, today, Img } from "./ui";
+import { Collage, I, Ico, Tile, fmtDate, iso, money, today, Img, SecretKey } from "./ui";
 import { NewBoardSheet } from "./boards";
 import { SetupBanner, StyleHub } from "./style";
 import { ClosetReview, Rediscover, StyleMeCard } from "./stylist";
@@ -14,6 +14,7 @@ import { PrivacyCard } from "./privacy";
 import { TryOnSettings } from "./avatar-photo";
 import { itemFit } from "@/lib/style/score";
 import { useStore } from "./store";
+import { StylistCard } from "./advice";
 
 /* ============================== TODAY ============================== */
 export function TodayTab() {
@@ -326,7 +327,6 @@ function TasteCard() {
 export function MeTab() {
   const { items, outfits, boards, refresh, toast } = useStore();
   const [st, setSt] = useState<Awaited<ReturnType<typeof api.settings>> | null>(null);
-  const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   async function exportAll() {
@@ -340,12 +340,6 @@ export function MeTab() {
   const loadedOnce = useRef(false);
   if (!loadedOnce.current) { loadedOnce.current = true; api.settings().then(setSt).catch(() => {}); }
 
-  async function saveKey() {
-    await api.saveSettings({ geminiKey: key });
-    setKey("");
-    setSt(await api.settings());
-    toast(key.trim() ? "Key saved on this computer" : "Key removed");
-  }
   async function doImport(f: File) {
     if (!confirm("Importing replaces your entire current library. Continue?")) return;
     setBusy(true);
@@ -374,6 +368,7 @@ export function MeTab() {
           <p className="xs muted" style={{ marginTop: 8, lineHeight: 1.5 }}>Photos are analysed on this device and never saved — only the results are kept.</p>
         </div>
         <PrivacyCard />
+        <StylistCard />
         <AvatarCard />
         <GroomingCard />
         <TasteCard />
@@ -384,16 +379,19 @@ export function MeTab() {
           <div className="card" style={{ padding: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <b style={{ fontSize: 15 }}>{st?.aiAvailable ? "Connected" : "Not connected"}</b>
-              <span className={`pill ${st?.aiAvailable ? "ai" : "guess"}`}>{st?.aiProvider === "gemini" ? `Gemini ${st.geminiHint}` : st?.aiProvider === "anthropic" ? "Claude (fallback)" : "Using local colour guess"}</span>
+              <span className={`pill ${st?.aiAvailable ? "ai" : "guess"}`}>{st?.aiProvider === "gemini" ? "Gemini · key saved" : st?.aiProvider === "anthropic" ? "Claude (fallback)" : "Using local colour guess"}</span>
             </div>
             <p className="xs muted" style={{ margin: "8px 0 10px", lineHeight: 1.5 }}>
               Paste your own Gemini API key (from Google AI Studio). Every AI feature uses it: filling in a piece’s details, splitting an outfit photo, and reading inspiration looks. Without a key Capsule guesses colour and category on this computer. The key is stored only on this computer; photos go to Google only when you use one of those features.
             </p>
             {st?.geminiFromEnv ? <div className="xs muted">Key is set via the GEMINI_API_KEY environment variable.</div> : (
-              <div style={{ display: "flex", gap: 8 }}>
-                <input className="input" type="password" placeholder="AIza…" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" />
-                <button className="btn dark" disabled={!key.trim() && !st?.geminiHint} onClick={saveKey}>{key.trim() || !st?.geminiHint ? "Save" : "Remove"}</button>
-              </div>
+              <SecretKey
+                isSet={!!st?.geminiHint}
+                placeholder="Paste your Gemini API key"
+                noun="Gemini key"
+                onSave={async (v) => { await api.saveSettings({ geminiKey: v }); setSt(await api.settings()); toast("Key saved on this computer"); }}
+                onRemove={async () => { await api.saveSettings({ geminiKey: "" }); setSt(await api.settings()); toast("Key removed"); }}
+              />
             )}
             <div style={{ marginTop: 14 }}>
               <b style={{ fontSize: 13 }}>Quality</b>
@@ -408,6 +406,7 @@ export function MeTab() {
                   Piece details — <code>{st.aiModels[st.aiQuality].tag}</code><br />
                   Outfit photo split — <code>{st.aiModels[st.aiQuality].split}</code><br />
                   Inspiration looks — <code>{st.aiModels[st.aiQuality].look}</code><br />
+                  Stylist advice — <code>{st.aiModels[st.aiQuality].advice}</code><br />
                   “Better” moves outfit and look photos to a stronger model — still a few cents per hundred photos, but about 2–3× Economy.
                 </p>
               )}

@@ -10,7 +10,7 @@ import type { Fit } from "@/lib/style/score";
 import { hexToRgb, median, medianRgb, rgbToHex } from "@/lib/style/color";
 import { Overlay, Chips } from "./ui";
 import { AvatarFigure } from "./avatar";
-import { useFigureWidth, useWide } from "./my-photos";
+import { MyPhotos, useFigureWidth, useWide } from "./my-photos";
 import { useStore } from "./store";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -420,38 +420,12 @@ function ColourStep({ p, setP }: SP) {
 const Dot = ({ c }: { c: string | null }) => <span style={{ width: 16, height: 16, borderRadius: "50%", background: c ?? "#ddd", boxShadow: "inset 0 0 0 1px rgba(0,0,0,.15)", display: "inline-block", opacity: c ? 1 : 0.35 }} />;
 
 function FaceStep({ p, setP }: SP) {
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-  const [ratios, setRatios] = useState<FaceRatios | null>(null);
-  const file = useRef<HTMLInputElement>(null);
-
-  async function onPhoto(f: File) {
-    setBusy(true); setNote(null);
-    try {
-      const r = await analyseFacePhoto(f);
-      if (!r.ok) setNote(r.reason);
-      else if (!r.ratios) setNote("Couldn't measure the face outline in this photo.");
-      else {
-        const g = classifyFace(r.ratios);
-        setRatios(r.ratios);
-        setP({ ...p, face: { ...p.face, auto: { shape: g.shape, confidence: g.confidence, alternatives: g.alternatives }, shape: p.face.overridden ? p.face.shape : g.shape } });
-        setNote("Best guess from your outline. Face shape from a photo is rough — pick the one that feels right.");
-      }
-    } catch (e) { setNote(e instanceof Error ? `Couldn't run the face model: ${e.message}` : "Couldn't run the face model."); }
-    setBusy(false);
-  }
   const auto = p.face.auto;
   return (
     <div className="sec" style={{ paddingTop: 8 }}>
-      <p className="sm muted" style={{ lineHeight: 1.5, marginBottom: 12 }}>Face shape helps with necklines and collars now, and with glasses, hair and beard styles later. Hair pulled back, neutral expression, facing the camera.</p>
-      <div className="drop">
-        <button className="btn dark" disabled={busy} onClick={() => file.current?.click()}>{busy ? "Analysing…" : "Choose a front-facing photo"}</button>
-        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onPhoto(f); }} />
-        <div className="xs" style={{ marginTop: 8 }}>Analysed on this device · not uploaded or saved</div>
-      </div>
-      {note && <div className="card" style={{ padding: 12, marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>{note}</div>}
+      <p className="sm muted" style={{ lineHeight: 1.5, marginBottom: 12 }}>Face shape helps with necklines and collars, and with glasses, hair and beard styles. It uses the same face photo as <b>My avatar and face</b> — add it once and everything stays in step. Hair pulled back, neutral expression, facing the camera.</p>
+      <MyPhotos p={p} setP={setP} kinds={["face"]} />
       {auto && <div className="sm muted" style={{ marginTop: 12 }}>Estimate: <b style={{ color: "var(--ink)" }}>{cap(auto.shape)}</b> ({pct(auto.confidence)}); also close: {auto.alternatives.map(cap).join(", ")}.</div>}
-      {ratios && <div className="xs muted" style={{ marginTop: 4 }}>Length÷width {ratios.lengthToWidth} · forehead÷cheek {ratios.foreheadToCheek} · jaw÷cheek {ratios.jawToCheek}</div>}
       <label className="f" style={{ marginTop: 18 }}>Your face shape</label>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {FACE_SHAPES.map((s: FaceShape) => (
@@ -461,7 +435,7 @@ function FaceStep({ p, setP }: SP) {
       {p.face.shape && <p className="sm" style={{ marginTop: 12, lineHeight: 1.5 }}>{FACE_BLURB[p.face.shape]}</p>}
       <label className="job" style={{ marginTop: 14, cursor: "pointer" }}>
         <input type="checkbox" checked={p.face.wearsGlasses} onChange={(e) => setP({ ...p, face: { ...p.face, wearsGlasses: e.target.checked } })} />
-        <span>I wear glasses <span className="muted xs">(for frame suggestions later)</span></span>
+        <span>I wear glasses <span className="muted xs">(for frame suggestions)</span></span>
       </label>
     </div>
   );

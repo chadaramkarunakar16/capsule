@@ -3,7 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { anthropicKey, geminiKey, readSettings, tagModel, writeSettings } from "./settings";
 
-export type Feature = "tag" | "split" | "look";
+export type Feature = "tag" | "split" | "look" | "advice";
 export type Quality = "economy" | "better";
 
 /**
@@ -11,14 +11,16 @@ export type Quality = "economy" | "better";
  *  - gemini-3.1-flash-lite  0.25 / 1.50  one garment on a plain background: read colour, type, fit. Easy.
  *  - gemini-3.5-flash-lite  0.30 / 2.50  must place boxes around garments in a busy photo and list several pieces.
  *  - gemini-3.6-flash       0.75 / 3.75  only if "Better" is chosen; more reliable boxes and shopping queries.
+ * "advice" (stylist answers from the knowledge brief, optionally with a face photo) is mostly reading and reasoning over text:
+ *    Economy uses gemini-3.5-flash-lite, Better uses gemini-3.6-flash.
  * Thinking is set to minimal and images are sent at the lowest useful resolution to keep each call to a fraction of a cent.
  */
 export const MODELS: Record<Quality, Record<Feature, string>> = {
-  economy: { tag: "gemini-3.1-flash-lite", split: "gemini-3.5-flash-lite", look: "gemini-3.5-flash-lite" },
-  better: { tag: "gemini-3.5-flash-lite", split: "gemini-3.6-flash", look: "gemini-3.6-flash" },
+  economy: { tag: "gemini-3.1-flash-lite", split: "gemini-3.5-flash-lite", look: "gemini-3.5-flash-lite", advice: "gemini-3.5-flash-lite" },
+  better: { tag: "gemini-3.5-flash-lite", split: "gemini-3.6-flash", look: "gemini-3.6-flash", advice: "gemini-3.6-flash" },
 };
-const IMAGE_DETAIL: Record<Feature, "LOW" | "MEDIUM"> = { tag: "LOW", split: "MEDIUM", look: "MEDIUM" };
-const LONGEST_SIDE: Record<Feature, number> = { tag: 768, split: 1280, look: 1280 };
+const IMAGE_DETAIL: Record<Feature, "LOW" | "MEDIUM"> = { tag: "LOW", split: "MEDIUM", look: "MEDIUM", advice: "MEDIUM" };
+const LONGEST_SIDE: Record<Feature, number> = { tag: 768, split: 1280, look: 1280, advice: 1024 };
 
 export const quality = (): Quality => (readSettings().aiQuality === "better" ? "better" : "economy");
 export const aiReady = () => !!(geminiKey() || anthropicKey());
@@ -68,15 +70,15 @@ const friendly = (status: number, msg: string) =>
   : status === 429 ? "Gemini says you’ve hit a rate or quota limit. Wait a minute, or check your plan in Google AI Studio."
   : `Gemini error ${status}: ${msg.slice(0, 160)}`;
 
-async function gemini(model: string, feature: Feature, prompt: string, img: { data: Uint8Array; mime: string }, maxTokens: number) {
+async function gemini(model: string, feature: Feature, prompt: string, img: { data: Uint8Array; mime: string } | null, maxTokens: number) {
   const url = `${process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com"}/v1beta/models/${model}:generateContent`; // base override is for tests
   const body = (extra: boolean) => JSON.stringify({
-    contents: [{ role: "user", parts: [{ inline_data: { mime_type: img.mime, data: b64(img.data) } }, { text: prompt }] }],
+    contents: [{ role: "user", parts: [...(img ? [{ inline_data: { mime_type: img.mime, data: b64(img.data) } }] : []), { text: prompt }] }],
     generationConfig: {
       responseMimeType: "application/json",
       maxOutputTokens: maxTokens,
       temperature: 0.2,
-      ...(extra ? { thinkingConfig: { thinkingLevel: "minimal" }, mediaResolution: `MEDIA_RESOLUTION_${IMAGE_DETAIL[feature]}` } : {}),
+      ...(extra ? { thinkingConfig: { thinkingLevel: "minimal" }, ...(img ? { mediaResolution: `MEDIA_RESOLUTION_${IMAGE_DETAIL[feature]}` } : {}) } : {}),
     },
   });
   const call = (extra: boolean) => fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": geminiKey() }, body: body(extra) });
@@ -93,22 +95,22 @@ async function gemini(model: string, feature: Feature, prompt: string, img: { da
   return text;
 }
 
-async function claude(prompt: string, img: { data: Uint8Array; mime: string }, maxTokens: number) {
+async function claude(prompt: string, img: { data: Uint8Array; mime: string } | null, maxTokens: number) {
   const client = new Anthropic({ apiKey: anthropicKey() });
   const msg = await client.messages.create({
     model: tagModel(),
     max_tokens: maxTokens,
     messages: [{ role: "user", content: [
-      { type: "image", source: { type: "base64", media_type: img.mime as "image/jpeg", data: b64(img.data) } },
-      { type: "text", text: prompt },
+      ...(img ? [{ type: "image" as const, source: { type: "base64" as const, media_type: img.mime as "image/jpeg", data: b64(img.data) } }] : []),
+      { type: "text" as const, text: prompt },
     ] }],
   });
   return msg.content.map((c) => (c.type === "text" ? c.text : "")).join("");
 }
 
 /** Sends one photo + prompt, returns the parsed JSON object the model answered with. */
-export async function askJSON(feature: Feature, o: { image: Uint8Array; mime: string; prompt: string; maxTokens?: number }): Promise<Record<string, unknown>> {
-  const img = await shrink(o.image, o.mime, LONGEST_SIDE[feature]);
+export async function askJSON(feature: Feature, o: { image?: Uint8Array; mime?: string; prompt: string; maxTokens?: number }): Promise<Record<string, unknown>> {
+  const img = o.image ? await shrink(o.image, o.mime ?? "image/jpeg", LONGEST_SIDE[feature]) : null;
   const max = o.maxTokens ?? 900;
   const text = geminiKey() ? await gemini(MODELS[quality()][feature], feature, o.prompt, img, max) : await claude(o.prompt, img, max);
   const m = text.match(/\{[\s\S]*\}/);

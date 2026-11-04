@@ -18,6 +18,7 @@ export type Overlay =
   | { t: "look"; id: string }
   | { t: "avatar" }
   | { t: "privacy" }
+  | { t: "advice"; topic: "grooming" | "outfits" }
   | { t: "grooming" }
   | { t: "groomstyle"; kind: "hair" | "beard" | "glasses"; id: string }
   | { t: "glassesphoto"; frame?: string }

@@ -1,4 +1,5 @@
 // "Suits you" scoring: transparent rules → score + human-readable reasons.
+import { buildOf, heightBand } from "./build";
 import { hueGap, traits } from "./color";
 import type { Profile } from "./profile";
 import { paletteFit, seasonByKey } from "./seasons";
@@ -98,6 +99,27 @@ export function itemFit(it: StyleItem, p: Profile): Fit {
     reasons.push({ text: "A fitted cut shows your defined waist", delta: 5, kind: "proportion" });
   if (b.waist === "straight" && (["relaxed", "oversized"].includes(fit) || str(it.attrs?.closure).includes("structured")))
     reasons.push({ text: "A relaxed or structured cut creates shape without needing a defined waist", delta: 4, kind: "proportion" });
+
+
+  // ---- build and height (neutral: what a cut does, not what a body should be)
+  const bld = buildOf(p)?.key, hb = heightBand(p.basics.height);
+  const textured = ["textured", "checked", "striped"].includes(str(it.pattern));
+  if (bld === "lean") {
+    if (it.category === "Outerwear") reasons.push({ text: "A layer adds depth and shape to a lean frame", delta: 6, kind: "proportion" });
+    if (it.category === "Tops" && (textured || ["relaxed", "regular"].includes(fit))) reasons.push({ text: "Texture and a little room give a lean frame some body", delta: 4, kind: "proportion" });
+    if (it.category === "Bottoms" && ["straight", "relaxed", "regular"].includes(fit)) reasons.push({ text: "A straight or relaxed leg adds balance without clinging", delta: 3, kind: "proportion" });
+  }
+  if (bld === "fuller") {
+    if (it.category === "Bottoms" && traits(it.colorHex).L < 45) reasons.push({ text: "A darker bottom keeps a clean, long line", delta: 4, kind: "proportion" });
+    if (it.category === "Tops" && neck(it).includes("v") && !neck(it).includes("crew")) reasons.push({ text: "An open V-neck lengthens the neckline", delta: 4, kind: "proportion" });
+    if (it.category === "Outerwear" && ["regular", "straight", "fitted"].includes(fit)) reasons.push({ text: "A structured layer skims the body and adds a vertical line", delta: 4, kind: "proportion" });
+  }
+  if (hb === "shorter") {
+    if (it.category === "Bottoms" && rise(it) === "high") reasons.push({ text: "High-rise lengthens a shorter frame", delta: 4, kind: "proportion" });
+    if (it.category === "Outerwear" && length(it) === "cropped") reasons.push({ text: "A cropped layer keeps the leg line long", delta: 3, kind: "proportion" });
+    if (it.category === "Tops" && (length(it) === "long" || fit === "oversized")) reasons.push({ text: "A very long or oversized top can shorten the leg line", delta: -3, kind: "proportion" });
+  }
+  if (hb === "taller" && (it.category === "Outerwear" || it.category === "Tops") && length(it) === "long") reasons.push({ text: "Longer lengths suit a taller frame", delta: 3, kind: "proportion" });
 
   // ---- goals
   for (const aim of p.basics.aims) {
@@ -212,6 +234,19 @@ export function outfitFit(items: StyleItem[], p: Profile, target?: number): Fit 
   if (p.basics.aims.includes("Look taller / lengthen legs") && clothes.length >= 2) {
     const lows = clothes.filter((i) => ["Tops", "Bottoms"].includes(i.category)).map((i) => traits(i.colorHex));
     if (lows.length === 2 && hueGap(lows[0].h, lows[1].h) < 30 && Math.abs(lows[0].L - lows[1].L) < 22) { reasons.push({ text: "A near-monochrome column lengthens the line — matches your goal", delta: 5, kind: "goal" }); sum += 5; }
+  }
+
+
+  // ---- build: layering for lean frames, one clean line for fuller frames
+  const bk = buildOf(p)?.key;
+  if (bk === "lean" && clothes.length >= 2) {
+    const layers = clothes.filter((i) => i.category === "Outerwear").length + (clothes.filter((i) => i.category === "Tops").length > 1 ? 1 : 0);
+    if (layers >= 1) { reasons.push({ text: "Layered, so the outfit has depth — a good fit for a lean frame", delta: 8, kind: "proportion" }); sum += 8; }
+    else if (clothes.some((i) => i.category === "Tops")) { reasons.push({ text: "A single layer can look flat on a lean frame — add an overshirt or jacket", delta: -4, kind: "proportion" }); sum -= 4; }
+  }
+  if (bk === "fuller" && clothes.length >= 2) {
+    const t = clothes.filter((i) => ["Tops", "Bottoms"].includes(i.category)).map((i) => traits(i.colorHex));
+    if (t.length === 2 && Math.abs(t[0].L - t[1].L) < 25) { reasons.push({ text: "A tonal top and bottom make one long, clean line", delta: 5, kind: "proportion" }); sum += 5; }
   }
 
   const score = clamp(Math.round(62 + sum), 35, 98);

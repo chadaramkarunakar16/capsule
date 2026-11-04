@@ -61,6 +61,43 @@ export function Chips<T extends string>({ options, value, onPick, labels }: { op
 }
 
 
+/**
+ * An API key field that never shows the key, not even part of it. Once a key is saved the field is closed
+ * (just "saved"), with Replace and Remove; Replace opens an empty box, and saving closes it again.
+ */
+export function SecretKey({ isSet, placeholder, onSave, onRemove, noun = "key" }: { isSet: boolean; placeholder: string; onSave: (value: string) => Promise<void>; onRemove: () => Promise<void>; noun?: string }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const open = !isSet || editing;
+  async function save() {
+    if (!value.trim()) return;
+    setBusy(true);
+    try { await onSave(value.trim()); setValue(""); setEditing(false); } finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!confirm(`Remove the saved ${noun} from this computer?`)) return;
+    setBusy(true);
+    try { await onRemove(); setValue(""); setEditing(false); } finally { setBusy(false); }
+  }
+  if (!open) {
+    return (
+      <div className="secret-row">
+        <span className="secret-mask" aria-label={`A ${noun} is saved`}>{"•".repeat(16)}<span className="xs muted"> saved · hidden</span></span>
+        <button className="btn light sm" disabled={busy} onClick={() => setEditing(true)}>Replace</button>
+        <button className="btn danger sm" disabled={busy} onClick={remove}>Remove</button>
+      </div>
+    );
+  }
+  return (
+    <form className="secret-row" onSubmit={(e) => { e.preventDefault(); save(); }} autoComplete="off">
+      <input className="input" type="password" name="capsule-secret" placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} autoComplete="new-password" spellCheck={false} autoFocus={editing} />
+      <button className="btn dark sm" type="submit" disabled={busy || !value.trim()}>Save</button>
+      {editing && <button className="btn light sm" type="button" disabled={busy} onClick={() => { setEditing(false); setValue(""); }}>Cancel</button>}
+    </form>
+  );
+}
+
 /** 2x2 preview of an outfit's pieces. */
 export function Collage({ items, big }: { items: Item[]; big?: boolean }) {
   const s = [...items].sort(byCat).slice(0, 4);

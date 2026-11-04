@@ -79,6 +79,8 @@ export const api = {
 
   avatarImage: (b: { photo?: string | null; facePhoto?: string | null }) => req<{ available: boolean; image?: string }>("/api/avatar/generate", send("POST", b)),
 
+  advice: (b: { topic: "grooming" | "outfits"; occasion?: string; useFacePhoto?: boolean }) => req<{ available: boolean; usedPhoto?: boolean; advice?: Advice }>("/api/advice", send("POST", b)),
+
   tryon: (b: { person: string; garments: { image: string; category: string }[] }) => req<{ available: boolean; image?: string; steps?: number; provider?: string }>("/api/tryon", send("POST", b)),
 
   inventory: () => req<{ rows: Record<string, number>; profile: boolean; photos: { files: number; bytes: number }; thumbs: { files: number; bytes: number }; models: { files: number; bytes: number }; keys: { anthropic: boolean; serpapi: boolean; fashn: boolean }; pin: boolean }>("/api/privacy/inventory"),
@@ -93,7 +95,13 @@ export const api = {
   logout: () => req("/api/auth/logout", send("POST")),
   exportAll: () => req<unknown>("/api/export"),
 
-  settings: () => req<{ aiProvider: "gemini" | "anthropic" | null; geminiHint: string | null; geminiFromEnv: boolean; aiQuality: "economy" | "better"; aiModels: Record<"economy" | "better", Record<"tag" | "split" | "look", string>>; aiUsage: { calls: number; inTok: number; outTok: number; byModel: Record<string, number> }; tryonAvailable: boolean; tryonProvider: "gemini" | "fashn" | null; tryonHasFashn: boolean; tryonHasGemini: boolean; tryonModel: string; tryonKeyHint: string | null; tryonKeyFromEnv: boolean; aiAvailable: boolean; keyHint: string | null; keyFromEnv: boolean; model: string; country: string; shopAvailable: boolean; shopKeyHint: string | null; shopKeyFromEnv: boolean }>("/api/settings"),
+  settings: () => req<{ aiProvider: "gemini" | "anthropic" | null; geminiHint: string | null; geminiFromEnv: boolean; aiQuality: "economy" | "better"; aiModels: Record<"economy" | "better", Record<"tag" | "split" | "look" | "advice", string>>; aiUsage: { calls: number; inTok: number; outTok: number; byModel: Record<string, number> }; tryonAvailable: boolean; tryonProvider: "gemini" | "fashn" | null; tryonHasFashn: boolean; tryonHasGemini: boolean; tryonModel: string; tryonKeyHint: string | null; tryonKeyFromEnv: boolean; aiAvailable: boolean; keyHint: string | null; keyFromEnv: boolean; model: string; country: string; shopAvailable: boolean; shopKeyHint: string | null; shopKeyFromEnv: boolean }>("/api/settings"),
   saveSettings: (b: { tryonProvider?: "gemini" | "fashn"; geminiKey?: string; aiQuality?: "economy" | "better"; fashnKey?: string; anthropicKey?: string; model?: string; serpApiKey?: string; country?: string }) => req("/api/settings", send("POST", b)),
   importData: (data: unknown) => req<{ items: number; outfits: number; boards: number }>("/api/import", send("POST", data)),
+};
+
+export type Advice = {
+  summary: string;
+  hair?: { id: string; why: string }[]; beard?: { id: string; why: string }[]; glasses?: { id: string; why: string }[]; sunglasses?: string; tips?: string[];
+  do?: string[]; avoid?: string[]; outfits?: { name: string; items: string[]; why: string }[];
 };

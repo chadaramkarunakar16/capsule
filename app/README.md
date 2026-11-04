@@ -135,6 +135,9 @@ Capsule installs like normal PC software: a window with a sidebar, a Desktop and
 - **How it works:** `desktop/main.cjs` (Electron) starts the same Next.js server privately on `127.0.0.1:47621` and shows it in a window. Wide windows get the desktop layout (sidebar, dialogs, multi-column grids); narrow ones fall back to the phone layout.
 - **Not signed:** Windows SmartScreen may warn on first run of an unsigned installer (More info → Run anyway). Signing needs a paid certificate.
 
+### Stylist knowledge layer
+`lib/knowledge/` holds Capsule's styling knowledge in one place: what hairstyles, beards, glasses and sunglasses suit each face shape; how a lean, average or fuller build, and a shorter or taller height, change what to wear (lean frames get layering, textured mid-weight fabrics and shoulder structure; fuller frames get tonal lines and structured mid-weight pieces); colour and skin-tone guidance; and healthy grooming basics. It was cross-checked against published eyewear and men's/women's style guides. It is used twice: the outfit scoring (`lib/style/score.ts`) and the grooming engine apply the same rules, and `brief()` turns the parts that apply to *you* into a short briefing that the AI reads **before** it answers (Me → Your stylist). The AI may only choose styles that exist in Capsule and closet pieces you own, so every suggestion can be opened and acted on. If you keep a face photo, the stylist can also look at it (sent to Google only when you ask).
+
 ### AI (your own Gemini key)
 Me → AI: paste a Gemini API key. Features pick the cheapest model that does the job (prices per 1M tokens, input / output; photo try-on per image):
 
@@ -142,6 +145,7 @@ Me → AI: paste a Gemini API key. Features pick the cheapest model that does th
 |---|---|---|
 | Piece details from one photo | `gemini-3.1-flash-lite` (0.25 / 1.50) | `gemini-3.5-flash-lite` (0.30 / 2.50) |
 | Splitting an outfit photo, reading inspiration looks | `gemini-3.5-flash-lite` | `gemini-3.6-flash` (0.75 / 3.75) |
+| Stylist advice | `gemini-3.5-flash-lite` | `gemini-3.6-flash` |
 | Photo try-on | `gemini-2.5-flash-image` (~$0.039 per image) | `gemini-3.1-flash-image` (~$0.067 per image) |
 
 Thinking is set to minimal, photos are shrunk before sending (768 px for single pieces, 1280 px otherwise) and single-garment photos use the lowest image detail. The settings card shows this month's call count. FASHN remains an optional alternative for try-on. Prices come from Google's pricing page as of Nov 2026 and change; the Gemini calls were tested against a mock server, not a live key.
