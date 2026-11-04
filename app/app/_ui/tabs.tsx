@@ -15,6 +15,7 @@ import { TryOnSettings } from "./avatar-photo";
 import { itemFit } from "@/lib/style/score";
 import { useStore } from "./store";
 import { StylistCard } from "./advice";
+import { GeminiKeyField } from "./gemini-key";
 
 /* ============================== TODAY ============================== */
 export function TodayTab() {
@@ -384,15 +385,7 @@ export function MeTab() {
             <p className="xs muted" style={{ margin: "8px 0 10px", lineHeight: 1.5 }}>
               Paste your own Gemini API key (from Google AI Studio). Every AI feature uses it: filling in a piece’s details, splitting an outfit photo, and reading inspiration looks. Without a key Capsule guesses colour and category on this computer. The key is stored only on this computer; photos go to Google only when you use one of those features.
             </p>
-            {st?.geminiFromEnv ? <div className="xs muted">Key is set via the GEMINI_API_KEY environment variable.</div> : (
-              <SecretKey
-                isSet={!!st?.geminiHint}
-                placeholder="Paste your Gemini API key"
-                noun="Gemini key"
-                onSave={async (v) => { await api.saveSettings({ geminiKey: v }); setSt(await api.settings()); toast("Key saved on this computer"); }}
-                onRemove={async () => { await api.saveSettings({ geminiKey: "" }); setSt(await api.settings()); toast("Key removed"); }}
-              />
-            )}
+            <GeminiKeyField onChange={async () => setSt(await api.settings())} />
             <div style={{ marginTop: 14 }}>
               <b style={{ fontSize: 13 }}>Quality</b>
               <div className="chips" style={{ padding: 0, margin: "6px 0" }}>

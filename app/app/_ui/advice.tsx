@@ -6,6 +6,7 @@ import { BUILD_KNOWLEDGE, FACE_KNOWLEDGE, HEIGHT_KNOWLEDGE } from "@/lib/knowled
 import { buildOf, heightBand } from "@/lib/style/build";
 import { Overlay } from "./ui";
 import { useStore } from "./store";
+import { GeminiKeyField } from "./gemini-key";
 
 type Topic = "grooming" | "outfits";
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -101,8 +102,13 @@ export function StylistAdvice({ topic: initial }: { topic: Topic }) {
 
         <div>
           <button className="btn dark" disabled={busy || ready === false} onClick={ask}>{busy ? "Thinking…" : shown ? "Ask again" : "Get my advice"}</button>
-          {ready === false && <p className="xs" style={{ color: "var(--danger)", marginTop: 6 }}>Add a Gemini key under Me → AI to use the stylist. The notes above work without one.</p>}
+          {ready === false && <p className="xs" style={{ color: "var(--danger)", marginTop: 6 }}>Add a Gemini key to use the stylist. The notes above work without one.</p>}
           {err && <p className="sm" style={{ color: "var(--danger)", marginTop: 6, lineHeight: 1.4 }}>{err}</p>}
+        </div>
+
+        <div className="ctl-group">
+          <h3>Gemini key</h3>
+          <GeminiKeyField onChange={(saved) => setReady(saved)} />
         </div>
 
         {shown && (

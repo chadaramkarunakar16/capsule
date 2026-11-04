@@ -84,7 +84,7 @@ export function SecretKey({ isSet, placeholder, onSave, onRemove, noun = "key" }
     return (
       <div className="secret-row">
         <span className="secret-mask" aria-label={`A ${noun} is saved`}>{"•".repeat(16)}<span className="xs muted"> saved · hidden</span></span>
-        <button className="btn light sm" disabled={busy} onClick={() => setEditing(true)}>Replace</button>
+        <button className="btn light sm" disabled={busy} onClick={() => setEditing(true)}>Edit key</button>
         <button className="btn danger sm" disabled={busy} onClick={remove}>Remove</button>
       </div>
     );
