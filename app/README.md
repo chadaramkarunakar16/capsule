@@ -135,6 +135,12 @@ Capsule installs like normal PC software: a window with a sidebar, a Desktop and
 - **How it works:** `desktop/main.cjs` (Electron) starts the same Next.js server privately on `127.0.0.1:47621` and shows it in a window. Wide windows get the desktop layout (sidebar, dialogs, multi-column grids); narrow ones fall back to the phone layout.
 - **Not signed:** Windows SmartScreen may warn on first run of an unsigned installer (More info → Run anyway). Signing needs a paid certificate.
 
+### Avatar, photos and keys
+- **My avatar and face** (Me tab): the live avatar sits beside the controls, so every change is visible as you make it. Add a face photo and a full-body photo; they fill in face shape, skin tone, hair colour, a first colour estimate and your proportions, shared with the style-profile questions (they read and write the same data).
+- **How I appear:** choose the simple figure, your own photo (kept on your PC only if you press "Use as my avatar"), or an AI image made from your photos by a Gemini image model. With a photo avatar, "On my photo" try-on starts from your saved photo.
+- **API keys are never shown.** Not even the last characters: a saved key appears as "saved · hidden" with **Edit key** and **Remove** (Me → AI, Your stylist, and Privacy & data).
+- **Offline cut-outs:** the background-removal model is downloaded into `public/imgly` by `npm run dev/build` (and the desktop build), so adding photos works offline and starts instantly.
+
 ### Stylist knowledge layer
 `lib/knowledge/` holds Capsule's styling knowledge in one place: what hairstyles, beards, glasses and sunglasses suit each face shape; how a lean, average or fuller build, and a shorter or taller height, change what to wear (lean frames get layering, textured mid-weight fabrics and shoulder structure; fuller frames get tonal lines and structured mid-weight pieces); colour and skin-tone guidance; and healthy grooming basics. It was cross-checked against published eyewear and men's/women's style guides. It is used twice: the outfit scoring (`lib/style/score.ts`) and the grooming engine apply the same rules, and `brief()` turns the parts that apply to *you* into a short briefing that the AI reads **before** it answers (Me → Your stylist). The AI may only choose styles that exist in Capsule and closet pieces you own, so every suggestion can be opened and acted on. If you keep a face photo, the stylist can also look at it (sent to Google only when you ask).
 
