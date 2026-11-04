@@ -2,17 +2,18 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { BROWSER_ENGINE, engineStatus } from "@/lib/engine";
+import { GeminiKeyField } from "./gemini-key";
 import { open as openBox, seal } from "@/lib/backup";
-import { Overlay, Sheet } from "./ui";
+import { Overlay, Sheet, SecretKey } from "./ui";
 import { useStore } from "./store";
 
 type Inv = Awaited<ReturnType<typeof api.inventory>>;
 const mb = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 
-const LEAVES: { who: string; what: string; when: string; on?: (i: Inv) => boolean }[] = [
-  { who: "Google Gemini", what: "Photos you add (shrunk first) so Gemini can fill in piece details, split outfit photos and read inspiration looks. For photo try-on: your photo and the garment images, each time you press the button.", when: "Only while an AI key is set.", on: (i) => i.keys.anthropic },
-  { who: "SerpApi", what: "Search words only (for example “olive overshirt men”). Never photos.", when: "Only while a shopping key is set.", on: (i) => i.keys.serpapi },
-  { who: "FASHN", what: "Your photo and the garment images — each time you press “On my photo”.", when: "Only with a try-on key and your tick each time.", on: (i) => i.keys.fashn },
+const LEAVES: { who: string; what: string; when: string; on?: (i: Inv) => boolean; key?: "gemini" | "serpapi" | "fashn" }[] = [
+  { who: "Google Gemini", what: "Photos you add (shrunk first) so Gemini can fill in piece details, split outfit photos and read inspiration looks. For photo try-on: your photo and the garment images, each time you press the button.", when: "Only while an AI key is set.", on: (i) => i.keys.anthropic, key: "gemini" },
+  { who: "SerpApi", what: "Search words only (for example “olive overshirt men”). Never photos.", when: "Only while a shopping key is set.", on: (i) => i.keys.serpapi, key: "serpapi" },
+  { who: "FASHN", what: "Your photo and the garment images — each time you press “On my photo”.", when: "Only with a try-on key and your tick each time.", on: (i) => i.keys.fashn, key: "fashn" },
   { who: "Open-Meteo", what: "The coordinates of the place you chose, to fetch a forecast.", when: "Only if you turn weather on." },
   { who: "Model downloads", what: "One-time downloads of the background-removal and face/pose models. Nothing of yours is sent.", when: "First use of those features." },
   { who: "Stores you open", what: "Links open in a new tab, like any link. Capsule adds no tracking or affiliate tags.", when: "When you tap a link." },
@@ -60,9 +61,12 @@ export function PrivacyCentre() {
             const on = l.on ? (inv ? l.on(inv) : false) : undefined;
             return (
               <div key={l.who} className="card" style={{ padding: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><b style={{ fontSize: 14 }}>{l.who}</b>{on !== undefined && <span className={`pill ${on ? "guess" : "ai"}`}>{on ? "Connected" : "Off"}</span>}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><b style={{ fontSize: 14 }}>{l.who}</b>{on !== undefined && <span className={`pill ${on ? "guess" : "ai"}`}>{on ? "Key saved" : "No key"}</span>}</div>
                 <div className="sm" style={{ lineHeight: 1.45, marginTop: 2 }}>{l.what}</div>
                 <div className="xs muted" style={{ marginTop: 2 }}>{l.when}</div>
+                {l.key === "gemini" && <div style={{ marginTop: 10 }}><GeminiKeyField onChange={() => load()} /></div>}
+                {l.key === "serpapi" && <div style={{ marginTop: 10 }}><SecretKey isSet={!!inv?.keys.serpapi} placeholder="Paste your SerpApi key" noun="shopping key" onSave={async (v) => { await api.saveSettings({ serpApiKey: v }); await load(); }} onRemove={async () => { await api.saveSettings({ serpApiKey: "" }); await load(); }} /></div>}
+                {l.key === "fashn" && <div style={{ marginTop: 10 }}><SecretKey isSet={!!inv?.keys.fashn} placeholder="Optional: FASHN API key" noun="FASHN key" onSave={async (v) => { await api.saveSettings({ fashnKey: v }); await load(); }} onRemove={async () => { await api.saveSettings({ fashnKey: "" }); await load(); }} /></div>}
               </div>
             );
           })}
