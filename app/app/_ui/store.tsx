@@ -90,6 +90,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLoaded(true);
   }, []);
 
+  // the data can change outside this window (a wipe, a restore, another window): reload it when you come back
+  useEffect(() => {
+    let last = Date.now();
+    const back = () => { if (document.visibilityState === "visible" && Date.now() - last > 15000) { last = Date.now(); refresh().catch(() => {}); } };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => { window.removeEventListener("focus", back); document.removeEventListener("visibilitychange", back); };
+  }, [refresh]);
+
   useEffect(() => {
     refresh().catch((e) => {
       console.error(e);

@@ -173,3 +173,26 @@ export function brief(p: Profile, topic: "grooming" | "outfits" | "all" = "all")
 
 export const ADVISOR_RULES = `You are Capsule's personal stylist and grooming advisor. Read the PERSON and KNOWLEDGE sections first and base every answer on them; do not contradict them.
 Rules: be specific and practical; explain WHY in terms of this person's face shape, build, height, proportions and colouring; use only options that exist in the lists you are given; never judge or rank bodies or faces, never suggest surgery, drugs, crash diets or anything unsafe; if information is missing, say what to add instead of guessing; keep the tone warm and plain.`;
+
+/**
+ * A short factual summary of who the AI is helping, taken from the profile (which the face and body photo analysis
+ * fills in). It goes in front of EVERY AI call so all features are consistent with what the photos revealed.
+ */
+export function personSummary(p: Profile): string {
+  const bk = buildOf(p), hb = heightBand(p.basics.height), season = seasonByKey(p.color.season);
+  const bits: string[] = [];
+  if (p.basics.direction) bits.push(`style direction ${p.basics.direction}`);
+  if (p.basics.height) bits.push(`${p.basics.height} cm${hb ? ` (${hb})` : ""}`);
+  if (bk) bits.push(`${bk.key} build`);
+  const prop = [p.body.shoulderHip, p.body.torsoLeg, p.body.waist].filter(Boolean);
+  if (prop.length) bits.push(`proportions: ${prop.join(", ")}`);
+  if (season) bits.push(`colouring: ${season.name}${p.avatar.skin ? ` (skin about ${p.avatar.skin})` : ""}`);
+  if (p.face.shape) bits.push(`${p.face.shape} face${p.face.wearsGlasses ? ", wears glasses" : ""}`);
+  const g = p.grooming;
+  if (g.hairType) bits.push(`${g.hairType} ${g.density ?? ""} hair${g.receding ? ", receding hairline" : ""}`.replace("  ", " "));
+  if (g.facialHair) bits.push(g.beardGrowth ? `beard growth ${g.beardGrowth}` : "open to facial hair");
+  if (p.basics.fit) bits.push(`prefers ${p.basics.fit.toLowerCase()} fits`);
+  if (p.basics.aims.length) bits.push(`goals: ${p.basics.aims.join("; ")}`);
+  const photos = [p.body.source === "photo" ? "body" : "", p.face.auto ? "face" : ""].filter(Boolean);
+  return bits.length ? `- About this person: ${bits.join("; ")}.${photos.length ? ` (Read from their ${photos.join(" and ")} photo${photos.length > 1 ? "s" : ""}; stay consistent with it.)` : ""}` : "";
+}

@@ -15,6 +15,7 @@ export function AddSheet() {
   const { setSheet, refresh, push, toast } = useStore();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [cut, setCut] = useState(false);
+  const [splitAll, setSplitAll] = useState(true);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -40,6 +41,19 @@ export function AddSheet() {
         const cutout: Blob = original;
         patch(id, { status: "Saving…" });
         const up = await api.upload(cutout, original);
+        if (splitAll) {
+          // a photo with a shirt AND trousers (and shoes...) becomes separate pieces, not one
+          patch(id, { status: "Checking for several pieces…" });
+          try {
+            const r = await api.split(up.image);
+            if (r.aiAvailable && (r.pieces?.length ?? 0) >= 2) {
+              const n = await fromPieces(id, original, r.pieces!);
+              patch(id, { status: `${n} separate pieces found — ready to review`, state: "done" });
+              ok++;
+              continue;
+            }
+          } catch (e) { console.warn("splitting failed, treating it as one piece", e); }
+        }
         let shown = up.image;
         if (cut) {
           // optional AI clean cut-out: the same garment alone on a plain background (about 4¢)
@@ -76,7 +90,37 @@ export function AddSheet() {
     if (ok) toast(`${ok} item${ok > 1 ? "s" : ""} ready to review`);
   }
 
-  /** A photo of someone wearing an outfit → each piece cropped, cut out and saved as a draft. Needs the AI key. */
+  /** Takes the pieces the AI found in one photo: crops each, optionally cuts it out, tags it, saves it as a draft and groups them as an outfit. */
+  async function fromPieces(id: number, original: Blob, pieces: NonNullable<Awaited<ReturnType<typeof api.split>>["pieces"]>) {
+    const bm = await createImageBitmap(original);
+    const ids: string[] = [];
+    for (let k = 0; k < pieces.length; k++) {
+      const p = pieces[k];
+      patch(id, { status: `Piece ${k + 1} of ${pieces.length}: ${p.name || p.category}…` });
+      const mx = (p.box[2] - p.box[0]) * 0.04, my = (p.box[3] - p.box[1]) * 0.04;
+      const x0 = Math.max(0, ((p.box[0] - mx) / 1000) * bm.width), y0 = Math.max(0, ((p.box[1] - my) / 1000) * bm.height);
+      const x1 = Math.min(bm.width, ((p.box[2] + mx) / 1000) * bm.width), y1 = Math.min(bm.height, ((p.box[3] + my) / 1000) * bm.height);
+      const c = document.createElement("canvas");
+      c.width = Math.max(8, Math.round(x1 - x0)); c.height = Math.max(8, Math.round(y1 - y0));
+      c.getContext("2d")!.drawImage(bm, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+      const crop = await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("crop failed"))), "image/jpeg", 0.9));
+      const saved = await api.upload(crop);
+      let shown = saved.image;
+      if (cut) { try { const cc = await api.cutout(saved.image); if (cc.available && cc.image) shown = cc.image; } catch (e) { console.warn("cut-out failed for a piece", e); } }
+      let tags: Awaited<ReturnType<typeof api.tag>>["tags"] | null = null;
+      try { const t = await api.tag(shown); if (t.aiAvailable && t.tags) tags = t.tags; } catch { /* keep the split's own labels */ }
+      const hex = tags?.colorHex ?? (await guessTags(crop, c.width, c.height)).colorHex ?? "#cccccc";
+      const item = await api.createItem({
+        image: shown, status: "draft", aiTagged: true, ...tags,
+        name: tags?.name || p.name, category: p.category, colorHex: hex, colorName: tags?.colorName || nameColor(hex),
+      });
+      ids.push(item.id);
+    }
+    if (ids.length > 1) await api.createOutfit({ name: "From photo", itemIds: ids });
+    return ids.length;
+  }
+
+  /** A photo of someone wearing an outfit → every piece cropped, tagged and saved as its own draft, plus the outfit. Needs the AI key. */
   async function processOutfit(f: File) {
     if (!f.type.startsWith("image/")) return toast("Please choose an image");
     setBusy(true);
@@ -86,39 +130,14 @@ export function AddSheet() {
       const original = await downscaleJpeg(f, 1600);
       patch(id, { status: "Uploading…" });
       const up = await api.upload(original);
-      patch(id, { status: "Finding the pieces you’re wearing…" });
+      patch(id, { status: "Finding every piece you’re wearing…" });
       const r = await api.split(up.image);
-      if (!r.aiAvailable) throw new Error("Splitting an outfit photo needs a Gemini key — add one in Me → AI (Gemini).");
+      if (!r.aiAvailable) throw new Error("Splitting an outfit photo needs an AI key — add one in Me → AI.");
       const pieces = r.pieces ?? [];
       if (!pieces.length) throw new Error("No separate pieces were found in this photo.");
-      const bm = await createImageBitmap(original);
-      const ids: string[] = [];
-      for (let k = 0; k < pieces.length; k++) {
-        const p = pieces[k];
-        patch(id, { status: `Piece ${k + 1} of ${pieces.length}: ${p.name || p.category}…` });
-        const mx = (p.box[2] - p.box[0]) * 0.04, my = (p.box[3] - p.box[1]) * 0.04;
-        const x0 = Math.max(0, ((p.box[0] - mx) / 1000) * bm.width), y0 = Math.max(0, ((p.box[1] - my) / 1000) * bm.height);
-        const x1 = Math.min(bm.width, ((p.box[2] + mx) / 1000) * bm.width), y1 = Math.min(bm.height, ((p.box[3] + my) / 1000) * bm.height);
-        const c = document.createElement("canvas");
-        c.width = Math.max(8, Math.round(x1 - x0)); c.height = Math.max(8, Math.round(y1 - y0));
-        c.getContext("2d")!.drawImage(bm, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
-        const crop = await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("crop failed"))), "image/jpeg", 0.9));
-        const cutout: Blob = crop;
-        const saved = await api.upload(cutout);
-        let shown = saved.image;
-        if (cut) { try { const c = await api.cutout(saved.image); if (c.available && c.image) shown = c.image; } catch (e) { console.warn("cut-out failed for a piece", e); } }
-        let tags: Awaited<ReturnType<typeof api.tag>>["tags"] | null = null;
-        try { const t = await api.tag(shown); if (t.aiAvailable && t.tags) tags = t.tags; } catch { /* keep the split's own labels */ }
-        const hex = tags?.colorHex ?? (await guessTags(cutout, c.width, c.height)).colorHex ?? "#cccccc";
-        const item = await api.createItem({
-          image: shown, status: "draft", aiTagged: true, ...tags,
-          name: tags?.name || p.name, category: p.category, colorHex: hex, colorName: tags?.colorName || nameColor(hex),
-        });
-        ids.push(item.id);
-      }
-      await api.createOutfit({ name: "From photo", itemIds: ids });
+      const n = await fromPieces(id, original, pieces);
       await refresh();
-      patch(id, { status: `${ids.length} pieces ready to review`, state: "done" });
+      patch(id, { status: `${n} piece${n === 1 ? "" : "s"} ready to review`, state: "done" });
       toast("Pieces added as drafts — review them next");
     } catch (e) {
       patch(id, { status: e instanceof Error ? e.message : "Failed", state: "error" });
@@ -138,7 +157,7 @@ export function AddSheet() {
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); if (!busy) processFiles([...e.dataTransfer.files]); }}
       >
-        <div style={{ marginBottom: 10 }}>Drop photos here — hanger, flat-lay or floor shots, one item per photo</div>
+        <div style={{ marginBottom: 10 }}>Drop photos here — single pieces, or whole outfits (they’re separated into pieces)</div>
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
           <button className="btn dark" disabled={busy} onClick={() => input.current?.click()}>Choose photos</button>
           <button className="btn light" disabled={busy} onClick={() => outfitInput.current?.click()}>Outfit photo</button>
@@ -147,6 +166,10 @@ export function AddSheet() {
         <input ref={outfitInput} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) processOutfit(f); }} />
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; processFiles(fs); }} />
       </div>
+      <label className="job" style={{ cursor: "pointer", marginTop: 6 }}>
+        <input type="checkbox" checked={splitAll} onChange={(e) => setSplitAll(e.target.checked)} disabled={busy} />
+        <span>Separate outfits into pieces <span className="muted xs">(a photo with a shirt and trousers becomes two pieces, shoes a third; uses your AI key)</span></span>
+      </label>
       <label className="job" style={{ cursor: "pointer", marginTop: 6 }}>
         <input type="checkbox" checked={cut} onChange={(e) => setCut(e.target.checked)} disabled={busy} />
         <span>Clean AI cut-outs <span className="muted xs">(plain background; about 4¢ per piece, uses your AI key)</span></span>

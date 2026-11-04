@@ -457,6 +457,14 @@ export function ShopSection() {
   const [sheet, setSheet] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const wanted = useWanted();
+  const [sel, setSel] = useState<Set<string> | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  async function deleteSelected() {
+    if (!sel?.size || !confirm(`Remove ${sel.size} inspiration look${sel.size === 1 ? "" : "s"}? Products you saved to your wishlist are kept.`)) return;
+    setDeleting(true);
+    try { for (const id of sel) await api.deleteLook(id); await refresh(); toast(`Removed ${sel.size}`); setSel(null); } catch (e) { toast(e instanceof Error ? e.message : "Couldn’t remove"); }
+    setDeleting(false);
+  }
   async function setWant(look: Look, pieceId: string, want: NonNullable<Piece["want"]>) {
     await api.patchLook(look.id, { pieces: look.pieces.map((p) => (p.id === pieceId ? { ...p, want } : p)) });
     await refresh();
@@ -469,14 +477,21 @@ export function ShopSection() {
   }
   return (
     <div style={{ paddingTop: 12 }}>
-      <div className="sec" style={{ paddingTop: 0 }}><h3>Inspiration looks {looks.length ? `· ${looks.length}` : ""}</h3></div>
+      <div className="sec" style={{ paddingTop: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <h3 style={{ margin: 0 }}>Inspiration looks {looks.length ? `· ${looks.length}` : ""}</h3>
+        <span style={{ display: "flex", gap: 8 }}>
+          {looks.length > 0 && <button className="chip" style={{ height: 28 }} onClick={() => setSel(sel ? null : new Set())}>{sel ? "Done" : "Select"}</button>}
+          {sel && <button className="chip" style={{ height: 28 }} onClick={() => setSel(new Set(looks.map((l) => l.id)))}>All</button>}
+          {sel && <button className="chip" style={{ height: 28, background: "var(--danger)", color: "#fff", borderColor: "var(--danger)" }} disabled={!sel.size || deleting} onClick={deleteSelected}>{deleting ? "Removing…" : `Delete (${sel.size})`}</button>}
+        </span>
+      </div>
       <div className="grid3" style={{ paddingTop: 0 }}>
         <button className="tile" onClick={() => setSheet(true)}>
           <div className="img" style={{ border: "1.5px dashed #cfc8bc", boxShadow: "none", background: "transparent", color: "var(--muted)", fontSize: 13, textAlign: "center" }}><span>＋<br />New look</span></div>
           <div className="b">Shop a look</div><div className="t">From a photo</div>
         </button>
         {looks.map((l) => (
-          <button className="tile" key={l.id} onClick={() => push({ t: "look", id: l.id })}>
+          <button className={`tile ${sel?.has(l.id) ? "sel" : ""}`} key={l.id} onClick={() => { if (!sel) return push({ t: "look", id: l.id }); setSel((cur) => { const n = new Set(cur ?? []); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; }); }}>
             <div className="img" style={{ overflow: "hidden" }}><Img name={l.image} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "none" }} /></div>
             <div className="b">{l.pieces.length ? `${l.pieces.filter((p) => (p.want ?? "tobuy") === "tobuy").length} to buy · ${l.pieces.length} pieces` : "Not analysed yet"}</div>
             <div className="t">{new Date(l.createdAt.replace(" ", "T") + "Z").toLocaleDateString(undefined, { day: "numeric", month: "short" })}</div>

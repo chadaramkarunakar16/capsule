@@ -149,6 +149,7 @@ export function AvatarEditor() {
         <div className="split-fig">
           <div className="split-stage"><AvatarFigure profile={p} width={figW} /></div>
           <div className="xs muted" style={{ textAlign: "center", marginTop: 6 }}>Live preview — updates as you change things</div>
+          <button className="btn light sm" style={{ width: "100%", marginTop: 8 }} onClick={() => push({ t: "tryon", itemIds: [] })}>Try outfits on me</button>
         </div>
         <div className="ctl">
           <p className="xs muted" style={{ lineHeight: 1.5 }}>A simple figure to help you judge proportion and colour — not a portrait. It uses the same answers as your style profile, so anything you set here or there is shared.</p>
@@ -257,7 +258,7 @@ export function AvatarEditor() {
 export function TryOnScreen({ itemIds, name }: { itemIds: string[]; name?: string }) {
   const { profile, itemById, outfits, pop, push, toast, refresh } = useStore();
   const [ids, setIds] = useState<string[]>(itemIds);
-  const [picking, setPicking] = useState(false);
+  const [picking, setPicking] = useState(itemIds.length === 0); // opened from "Try on me" with nothing chosen: pick pieces first
   const [saving, setSaving] = useState(false);
   const items = ids.map((i) => itemById[i]).filter(Boolean);
   const noAvatar = !profile.body.shoulderHip && !profile.body.torsoLeg && !profile.avatar.skin;
@@ -350,7 +351,10 @@ export function AvatarCard() {
         <div style={{ flex: 1 }}>
           <b style={{ fontSize: 15 }}>Preview figure</b>
           <div className="xs muted" style={{ lineHeight: 1.45, margin: "2px 0 8px" }}>See outfits on a figure with your proportions and colouring.</div>
-          <button className="btn dark sm" onClick={() => push({ t: "avatar" })}>Edit avatar</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn dark sm" onClick={() => push({ t: "avatar" })}>Edit avatar</button>
+            <button className="btn light sm" onClick={() => push({ t: "tryon", itemIds: [] })}>Try outfits on me</button>
+          </div>
         </div>
       </div>
     </div>

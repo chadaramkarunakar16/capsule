@@ -140,13 +140,24 @@ const SORTS = [
 ] as const;
 
 export function ClosetTab() {
-  const { items, drafts, outfits, boards, itemById, push, setSheet, loaded, profile, looks } = useStore();
+  const { items, drafts, outfits, boards, itemById, push, setSheet, loaded, profile, looks, refresh, toast } = useStore();
   const toBuy = useWanted().filter((w) => !w.own);
   const [view, setView] = useState<"items" | "outfits" | "boards" | "shop">("items");
   const [cat, setCat] = useState("All");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<(typeof SORTS)[number][0]>("new");
   const [newBoard, setNewBoard] = useState(false);
+  const [sel, setSel] = useState<Set<string> | null>(null); // null = not selecting
+  const [deleting, setDeleting] = useState(false);
+  const flip = (id: string) => setSel((cur) => { const n = new Set(cur ?? []); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  async function deleteSelected() {
+    if (!sel || !sel.size) return;
+    const what = view === "outfits" ? "outfit" : "piece";
+    if (!confirm(`Delete ${sel.size} ${what}${sel.size === 1 ? "" : "s"}? ${view === "outfits" ? "The pieces stay in your closet." : "They will also be removed from outfits and boards."}`)) return;
+    setDeleting(true);
+    try { for (const id of sel) await (view === "outfits" ? api.deleteOutfit(id) : api.deleteItem(id)); await refresh(); toast(`Deleted ${sel.size}`); setSel(null); } catch (e) { toast(e instanceof Error ? e.message : "Couldn\u2019t delete"); }
+    setDeleting(false);
+  }
 
   const list = useMemo(() => {
     const l = items.filter((i) => (cat === "All" || i.category === cat) && (!q || `${i.name} ${i.brand} ${i.colorName} ${i.category}`.toLowerCase().includes(q.toLowerCase())));
@@ -167,7 +178,7 @@ export function ClosetTab() {
       </div>
       <div className="seg">
         {(["items", "outfits", "boards", "shop"] as const).map((v) => (
-          <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v === "shop" ? "Inspo & buy" : v[0].toUpperCase() + v.slice(1)}</button>
+          <button key={v} className={view === v ? "on" : ""} onClick={() => { setSel(null); setView(v); }}>{v === "shop" ? "Inspo & buy" : v[0].toUpperCase() + v.slice(1)}</button>
         ))}
       </div>
       <div className="scroll">
@@ -194,10 +205,16 @@ export function ClosetTab() {
               {["All", ...CATEGORIES].map((c) => <button key={c} className={`chip ${c === cat ? "on" : ""}`} onClick={() => setCat(c)}>{c}</button>)}
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 20px 0" }}>
-              <span className="xs muted">{list.length} item{list.length === 1 ? "" : "s"}</span>
+              <span className="xs muted">{sel ? `${sel.size} selected` : `${list.length} item${list.length === 1 ? "" : "s"}`}</span>
+              <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                {items.length > 0 && !sel && <button className="chip" style={{ height: 28 }} onClick={() => push({ t: "tryon", itemIds: [] })}>Try on me</button>}
+                {items.length > 0 && <button className="chip" style={{ height: 28 }} onClick={() => setSel(sel ? null : new Set())}>{sel ? "Done" : "Select"}</button>}
+                {sel && <button className="chip" style={{ height: 28 }} onClick={() => setSel(new Set(list.map((i) => i.id)))}>All</button>}
+                {sel && <button className="chip" style={{ height: 28, background: "var(--danger)", color: "#fff", borderColor: "var(--danger)" }} disabled={!sel.size || deleting} onClick={deleteSelected}>{deleting ? "Deleting…" : `Delete (${sel.size})`}</button>}
               <select className="xs" style={{ background: "none", border: 0, color: "var(--muted)" }} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort">
                 {SORTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
               </select>
+              </span>
             </div>
             {loaded && items.length === 0 ? (
               <div className="empty">
@@ -207,16 +224,22 @@ export function ClosetTab() {
               </div>
             ) : (
               <div className="grid3">
-                {list.map((i) => { const f = itemFit(i, profile); const known = !!(profile.color.season || profile.body.shoulderHip); return <Tile key={i.id} item={i} onClick={() => push({ t: "item", id: i.id })} badge={known && f.score >= 85 ? "★ Suits you" : known && f.score < 62 ? "Selective" : i.wears === 0 ? "New" : undefined} />; })}
+                {list.map((i) => { const f = itemFit(i, profile); const known = !!(profile.color.season || profile.body.shoulderHip); return <Tile key={i.id} item={i} selected={!!sel?.has(i.id)} onClick={() => (sel ? flip(i.id) : push({ t: "item", id: i.id }))} badge={known && f.score >= 85 ? "★ Suits you" : known && f.score < 62 ? "Selective" : i.wears === 0 ? "New" : undefined} />; })}
               </div>
             )}
           </>
         )}
         {view === "outfits" && (
           <div className="grid2" style={{ paddingTop: 14 }}>
+            <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+              {sel && <span className="xs muted" style={{ marginRight: "auto" }}>{sel.size} selected</span>}
+              {outfits.length > 0 && <button className="chip" style={{ height: 28 }} onClick={() => setSel(sel ? null : new Set())}>{sel ? "Done" : "Select"}</button>}
+              {sel && <button className="chip" style={{ height: 28 }} onClick={() => setSel(new Set(outfits.map((o) => o.id)))}>All</button>}
+              {sel && <button className="chip" style={{ height: 28, background: "var(--danger)", color: "#fff", borderColor: "var(--danger)" }} disabled={!sel.size || deleting} onClick={deleteSelected}>{deleting ? "Deleting…" : `Delete (${sel.size})`}</button>}
+            </div>
             <button className="ocard new" onClick={() => push({ t: "outfit" })}><span>＋<br />New outfit</span></button>
             {outfits.map((o) => (
-              <button key={o.id} className="ocard" onClick={() => push({ t: "outfit", outfitId: o.id })}>
+              <button key={o.id} className={`ocard ${sel?.has(o.id) ? "sel" : ""}`} onClick={() => (sel ? flip(o.id) : push({ t: "outfit", outfitId: o.id }))}>
                 <Collage items={o.itemIds.map((i) => itemById[i]).filter(Boolean)} />
                 <div className="n">{o.name}</div>
                 <div className="s">{o.itemIds.length} pieces{o.occasion ? ` · ${o.occasion}` : ""}</div>

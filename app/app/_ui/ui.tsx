@@ -46,8 +46,14 @@ export function useImageUrl(name: string | null | undefined, w?: number) {
 type ImgProps = Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src"> & { name: string | null | undefined; w?: number };
 export function Img({ name, w, alt = "", ...rest }: ImgProps) {
   const src = useImageUrl(name, w);
+  const [bad, setBad] = useState<string | null>(null);
+  if (!src) return <span {...(rest as object)} aria-hidden style={{ display: "block", ...rest.style }} />;
+  if (bad === src) {
+    // the file is gone (for example after "Delete everything"), so say so instead of showing a broken-image icon
+    return <span title="This photo is no longer on this computer" style={{ display: "grid", placeItems: "center", width: "100%", height: "100%", minHeight: 40, color: "var(--muted)", fontSize: 11, textAlign: "center", ...rest.style, objectFit: undefined, filter: "none" }}>No photo</span>;
+  }
   // eslint-disable-next-line @next/next/no-img-element
-  return src ? <img src={src} alt={alt} {...rest} /> : <span {...(rest as object)} aria-hidden style={{ display: "block", ...rest.style }} />;
+  return <img src={src} alt={alt} onError={() => setBad(src)} {...rest} />;
 }
 
 export function Chips<T extends string>({ options, value, onPick, labels }: { options: readonly T[]; value: T | null | ""; onPick: (v: T | null) => void; labels?: Record<string, string> }) {

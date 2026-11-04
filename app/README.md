@@ -12,6 +12,8 @@ npm run dev        # http://localhost:3000
 Needs Node 22.5+ (uses the built-in `node:sqlite`). Data lives in `data/` (git-ignored):
 `data/capsule.db` and `data/uploads/`.
 
+**New here? Read [docs/GUIDE.md](docs/GUIDE.md): a step-by-step walkthrough and how the AI works.**
+
 ## AI everywhere, nothing installed
 
 Every smart feature runs on **your own AI key** (Google Gemini or OpenAI, chosen in *Me → AI*). Nothing runs on your computer: no downloaded models, no on-device vision. Reading a piece, reading your face and body photos, outfit splitting, inspiration looks, the stylist, try-on, glasses on your photo, clean cut-outs, the picture of you and the AI brain all go through the one key. Without a key the app still works as a manual wardrobe, and says what to add when a feature needs one.

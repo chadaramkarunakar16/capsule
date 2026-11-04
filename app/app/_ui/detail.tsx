@@ -58,6 +58,7 @@ export function ItemDetail({ id }: { id: string }) {
     <Overlay
       title={item.name || "Item"}
       onBack={pop}
+      right={<button className="chip" onClick={del}>Delete</button>}
       foot={dirty ? <button className="btn dark full" disabled={busy} onClick={save}>Save changes</button> : undefined}
     >
       <div className="hero"><Img name={item.image} alt={item.name} /></div>
@@ -70,6 +71,7 @@ export function ItemDetail({ id }: { id: string }) {
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
           <button className="btn dark sm" onClick={wearToday}>Wore it today</button>
           <button className="btn light sm" onClick={() => push({ t: "outfit", itemIds: [id] })}>Build an outfit</button>
+          <button className="btn light sm" onClick={() => push({ t: "tryon", itemIds: [id], name: item.name || undefined })}>Try on me</button>
           <button className="btn light sm" onClick={() => setBoard(true)}>Save to board</button>
         </div>
       </div>

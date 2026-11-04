@@ -173,3 +173,22 @@ test("the picture of you always uses the identity model, with the saved photos a
   assert.ok(r.image.endsWith("-avatar.png"));
   assert.equal((await post(avatar, {})).status, 400);
 });
+
+test("outfit photos are broken into every garment: the prompt demands top, bottom and shoes separately", async () => {
+  const split = await import("../app/api/split/route");
+  fs.writeFileSync(path.join(db.UPLOAD_DIR, "outfit.jpg"), Buffer.from(jpegUri.split(",")[1], "base64"));
+  textReply = { pieces: [
+    { name: "Olive overshirt", category: "Outerwear", box: [200, 150, 800, 520] },
+    { name: "White tee", category: "Tops", box: [250, 200, 750, 480] },
+    { name: "Dark jeans", category: "Bottoms", box: [250, 480, 750, 900] },
+    { name: "White sneakers", category: "Shoes", box: [280, 900, 700, 990] },
+    { name: "Speck", category: "Tops", box: [10, 10, 20, 20] },
+  ] };
+  seen.length = 0;
+  const r = await (await post(split, { image: "outfit.jpg" })).json();
+  assert.deepEqual(r.pieces.map((p: { name: string }) => p.name), ["Olive overshirt", "White tee", "Dark jeans", "White sneakers"], "four separate pieces, the tiny speck is dropped");
+  const t = prompt(seen[0]);
+  assert.match(t, /MUST produce at least two entries/);
+  assert.match(t, /never skip the bottoms or the shoes/);
+  assert.match(t, /Never merge several garments into one entry/);
+});

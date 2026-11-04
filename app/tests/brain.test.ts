@@ -167,3 +167,23 @@ test("the brain page can refresh, pause and forget", async () => {
   settings.writeSettings({});
   assert.equal((await brainRoute.POST(json({ action: "reflect" }))).status, 400, "needs an AI key");
 });
+
+test("every AI call starts with who the person is, from what their photos and answers established", () => {
+  wipe();
+  db.run("DELETE FROM profile");
+  db.run("INSERT INTO profile (id,data) VALUES (1,?)", JSON.stringify({
+    basics: { height: 181, weight: 58, direction: "Menswear", fit: "Relaxed", aims: [], goals: [] },
+    body: { shoulderHip: "balanced", torsoLeg: "longer-legs", waist: null, source: "photo" },
+    face: { shape: "round", auto: { shape: "round", confidence: 0.7, alternatives: [] }, overridden: false, wearsGlasses: true },
+    grooming: { hairType: "wavy", density: "thick", receding: false, facialHair: true, saved: [] },
+    avatar: { skin: "#c68e6a" },
+  }));
+  for (const feature of ["tag", "split", "look", "advice"]) {
+    const c = context.brainContext(feature);
+    assert.match(c, /About this person: style direction Menswear; 181 cm \(average\); lean build; proportions: balanced, longer-legs; round face, wears glasses; wavy thick hair/);
+    assert.match(c, /Read from their body and face photos; stay consistent with it/);
+  }
+  settings.writeSettings({ brainLearn: false });
+  assert.match(context.brainContext("advice"), /About this person/, "the person's own profile is shared even when learning is paused");
+  settings.writeSettings({});
+});

@@ -1,5 +1,7 @@
 // What every AI call is told about the person and how they use the app, so all features share one memory.
 import { all, get } from "../db";
+import { personSummary } from "../knowledge";
+import { normalizeProfile } from "../style/profile";
 import { brainLearns } from "../settings";
 
 export type Memory = { summary: string; likes: string[]; dislikes: string[]; rules: string[]; tagHints: string[] };
@@ -33,6 +35,9 @@ export function corrections(limit = 8): string[] {
 export function brainContext(feature: string): string {
   try {
     const lines: string[] = [];
+    // the person themselves: whatever the face and body photos and the questions established (always, not only when learning is on)
+    const row = get("SELECT data FROM profile WHERE id = 1");
+    if (row) { const who = personSummary(normalizeProfile(JSON.parse(row.data))); if (who) lines.push(who); }
     const items = all("SELECT category, color_name, formality, status, created_at FROM items WHERE status = 'active'");
     if (items.length) {
       const byCat = top(items.map((i) => i.category as string), 7);
